@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pydesktools"
+version = "0.0.1"
+authors = [
+  { name="openHacking", email="openHacking@126.com" },
+]
+description = "Python Desktop Tool Box"
+keywords = [
+  'python',
+  'tool',
+  'desktop',
+  'GUI',
+  'tkinter',
+  'UI'
+]
+
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+dependencies = [
+  'pydeskui==0.0.1'
+]
+classifiers = [
+        #   3 - Alpha
+        #   4 - Beta
+        #   5 - Production/Stable
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development :: Build Tools',
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/openHacking/PyDeskTools"
+"Bug Tracker" = "https://github.com/openHacking/PyDeskTools/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pydesktools = ['assets/**/*']
