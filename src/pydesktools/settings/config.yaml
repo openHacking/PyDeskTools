@@ -7,6 +7,7 @@ registry:
 
 logging:
   # Setting the log level: CRITICAL, ERROR, WARNING, INFO, DEBUG
+  level: 'DEBUG'
   
 plugins:
   # Packages to download from registry

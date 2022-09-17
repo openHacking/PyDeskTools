@@ -1,1 +1,4 @@
-pydeskui==0.0.1
+# pydeskui==0.0.1
+PyYAML==5.4
+packaging==20.4
+dacite==1.5.0
