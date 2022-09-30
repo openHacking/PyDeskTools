@@ -65,10 +65,10 @@ class PluginUtility:
                 f'Preparing installation of module: {missing} for package: {package_name}')
             try:
                 python = sys.executable
-                exit_code = subprocess.check_all(
+                exit_code = subprocess.check_call(
                     [python, '-m', 'pip', 'install', missing.__str__()],
-                    stout=subprocess.DEVNULL,
-                    sterr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 self._logger.info(
                     f'Installation of module: {missing} for package: {package_name} was returned exit code: {exit_code}'

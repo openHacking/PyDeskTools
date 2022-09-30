@@ -18,7 +18,7 @@ class AdvanceSamplePlugin(PluginCore):
         )
 
     @staticmethod
-    def _simulate_operation() -> None:
+    def __simulate_operation() -> None:
         sleep_duration = randint(1, 100) / 100
         sleep(sleep_duration)
 

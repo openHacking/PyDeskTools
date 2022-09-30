@@ -21,7 +21,7 @@ class FileSystem:
         return os.path.join(base_dir, 'settings')
 
     @staticmethod
-    def __get_plugins_directory() -> str:
+    def get_plugins_directory() -> str:
         base_dir = FileSystem.__get_base_dir()
         return os.path.join(base_dir, 'plugins')
 
@@ -53,3 +53,4 @@ class LogUtil(Logger):
         logger = logging.getLogger('plugin.architecture')
         logger.setLevel(log_level)
         return logger
+

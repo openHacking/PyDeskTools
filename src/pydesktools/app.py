@@ -19,8 +19,10 @@ def __init_cli() -> argparse:
         CRITICAL, ERROR, WARNING, INFO, DEBUG
         """
     )
+    
+    print('FileSystem',FileSystem)
     parser.add_argument(
-        '-d', '--directory', default=f'{FileSystem.__get_plugins_directory()}',help="""
+        '-d', '--directory', default=f'{FileSystem.get_plugins_directory()}',help="""
         (Optional) Supply a directory where plugins should be loaded from. The default is ./plugins
         """
     )
