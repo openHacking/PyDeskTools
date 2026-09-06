@@ -1,0 +1,8 @@
+{
+  "python": "3.13.7",
+  "build": "20250918",
+  "architecture": "aarch64-apple-darwin",
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-aarch64-apple-darwin-install_only_stripped.tar.gz",
+  "sha256": "10f26ea5fc7c4d9c012faf372898a801f34b8fd7730c677576263224d56835fe",
+  "licenses_archive_sha256": "e0010e9aa7ef57415e4665a98eb99daab896e7d439774008c8391aae3e1a7228"
+}

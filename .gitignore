@@ -7,7 +7,7 @@
 dist
 build
 lib
-docs
+/docs/_build/
 __pycache__
 
 # Logs
@@ -30,3 +30,11 @@ pids
 pydesktools.egg-info
 
 .env_tool
+.venv/
+.venv.*/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.pdtplugin

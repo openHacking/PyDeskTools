@@ -1,0 +1,137 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_CN\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Tools"
+msgstr "工具"
+
+msgid "Plugins"
+msgstr "插件"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "JSON input"
+msgstr "JSON 输入"
+
+msgid "Indent"
+msgstr "缩进"
+
+msgid "Sort keys"
+msgstr "排序对象键"
+
+msgid "Format"
+msgstr "格式化"
+
+msgid "Minify"
+msgstr "压缩"
+
+msgid "Import"
+msgstr "导入"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Export"
+msgstr "导出"
+
+msgid "Install local bundle"
+msgstr "安装本地插件包"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Disable"
+msgstr "禁用"
+
+msgid "Uninstall"
+msgstr "卸载"
+
+msgid "Restore JSON tool"
+msgstr "恢复 JSON 工具"
+
+msgid "Language"
+msgstr "语言"
+
+msgid "Theme"
+msgstr "主题"
+
+msgid "Appearance"
+msgstr "外观"
+
+msgid "Follow system"
+msgstr "跟随系统"
+
+msgid "Light"
+msgstr "亮色"
+
+msgid "Dark"
+msgstr "暗色"
+
+msgid "Run"
+msgstr "运行"
+
+msgid "Ready"
+msgstr "就绪"
+
+msgid "Working…"
+msgstr "处理中…"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Continue"
+msgstr "继续"
+
+msgid "Error"
+msgstr "错误"
+
+msgid "OK"
+msgstr "确定"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "JSON result"
+msgstr "JSON 结果"
+
+msgid "No result yet"
+msgstr "尚无结果"
+
+msgid "Copied to clipboard"
+msgstr "已复制到剪贴板"
+
+msgid "Enabled"
+msgstr "已启用"
+
+msgid "Disabled"
+msgstr "已停用"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "Plugin ID"
+msgstr "插件 ID"
+
+msgid "Select a plugin"
+msgstr "请选择插件"
+
+msgid "Delete saved data"
+msgstr "删除已保存的数据"
+
+msgid "Unverified local code runs with your OS permissions. Install?"
+msgstr "未验证的本地代码将以你的系统权限运行。是否安装？"
+
+msgid "Active work will be canceled. Continue?"
+msgstr "当前任务将被取消。是否继续？"
+
+msgid "Remove plugin code? Saved data is retained."
+msgstr "卸载插件代码？已保存的数据将保留。"
+
+msgid "Disable this plugin and delete its saved data and settings?"
+msgstr "禁用此插件并删除其已保存的数据和设置？"
+
+msgid "Preparing offline JSON tool…"
+msgstr "正在离线配置 JSON 工具…"

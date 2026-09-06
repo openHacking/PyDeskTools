@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: pydesk-json-tools
+Version: 0.1.0
+Summary: PyDeskTools isolated plugin architecture
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pydesktools-sdk<0.2,>=0.1
+Requires-Dist: simplejson<4,>=3.20
+Dynamic: license-file
+
+# PyDesk JSON Tools
+
+Part of the PyDeskTools 0.1.0 experimental release. MIT licensed.
+See the public repository documentation for contracts and examples.
+
+https://github.com/openHacking/PyDeskTools

@@ -1,13 +1,31 @@
 # PyDeskTools
 
-## Introduction
+An offline desktop toolbox with isolated Python plugins. **0.1.0 is experimental.**
+This milestone ships JSON Tools: format/minify, exact integer/decimal handling,
+UTF-8 file import, full-result copy and atomic export. No account or network is
+required at runtime. Screenshot and the other default tools are not implemented yet.
 
-Python Desktop Tool Box
+The macOS arm64 DMG contains the GUI, Tcl/Tk, a separate CPython 3.13 interpreter
+and the complete offline JSON plugin bundle. Drag the app to Applications. An
+ad-hoc test build is not Developer ID notarized and is not a public release.
 
-> ⚠️This project is still in development and is only for testing and learning, not production
+## Development
 
+The application requires Python 3.13+ with Tk 9 and PyDeskUI 0.2. The default
+offline plugin bundle currently targets CPython 3.13 on macOS arm64. See the
+[development guide](docs/development.md) for environment setup, editable installs,
+tests, troubleshooting, and launch commands.
 
-## Reference
+`pydesktools` and `python -m pydesktools` share one entrypoint. `--data-dir` selects
+an isolated application profile. The first launch provisions JSON Tools offline.
+Disabled/uninstalled defaults stay that way; Restore explicitly reinstalls the
+shipped version. Installing third-party code requires consent and starts disabled.
 
-- [Building a plugin architecture with Python](https://mwax911.medium.com/building-a-plugin-architecture-with-python-7b4ab39ad4fc)
-- [Plugin Architecture in Python](https://dev.to/charlesw001/plugin-architecture-in-python-jla)
+The application owns Tk and OS dialogs/clipboard. Runtime services import no GUI;
+SDK/plugin wheels can run without the toolbox. A plugin is ordinary local code
+with your OS authority, not a sandboxed extension. The host never imports it.
+
+See [implemented interfaces](docs/implemented-api.md), [release build](docs/build-release.md),
+[delivery evidence](docs/implementation-report.md), [contributing](CONTRIBUTING.md),
+and [architecture proposals](docs/README.md). Proposed screenshot/online/update
+contracts are not claims of implemented behavior.

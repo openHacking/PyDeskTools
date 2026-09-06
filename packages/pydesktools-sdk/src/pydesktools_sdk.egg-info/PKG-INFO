@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: pydesktools-sdk
+Version: 0.1.0
+Summary: PyDeskTools isolated plugin architecture
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: license-file
+
+# PyDeskTools SDK
+
+Part of the PyDeskTools 0.1.0 experimental release. MIT licensed.
+See the public repository documentation for contracts and examples.
+
+https://github.com/openHacking/PyDeskTools

@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+src/pydesktools_sdk/__init__.py
+src/pydesktools_sdk/api.py
+src/pydesktools_sdk/protocol.py
+src/pydesktools_sdk/py.typed
+src/pydesktools_sdk/runner.py
+src/pydesktools_sdk.egg-info/PKG-INFO
+src/pydesktools_sdk.egg-info/SOURCES.txt
+src/pydesktools_sdk.egg-info/dependency_links.txt
+src/pydesktools_sdk.egg-info/top_level.txt

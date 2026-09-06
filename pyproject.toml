@@ -1,47 +1,38 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
-
 [project]
 name = "pydesktools"
-version = "0.0.1"
-authors = [
-  { name="openHacking", email="openHacking@126.com" },
-]
-description = "Python Desktop Tool Box"
-keywords = [
-  'python',
-  'tool',
-  'desktop',
-  'GUI',
-  'tkinter',
-  'UI'
-]
-
+version = "0.1.0"
+description = "Offline desktop toolbox with isolated Python plugins"
 readme = "README.md"
-license = { file="LICENSE" }
-requires-python = ">=3.7"
-dependencies = [
-  'pydeskui==0.0.1'
-]
-classifiers = [
-        #   3 - Alpha
-        #   4 - Beta
-        #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'Topic :: Software Development :: Build Tools',
-        "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-]
-
-[project.urls]
-"Homepage" = "https://github.com/openHacking/PyDeskTools"
-"Bug Tracker" = "https://github.com/openHacking/PyDeskTools/issues"
-
+requires-python = ">=3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = ["pydeskui>=0.2,<0.3", "pydesktools-runtime>=0.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'"]
+[project.scripts]
+pydesktools = "pydesktools.app:main"
+[project.optional-dependencies]
+dev = ["build>=1.2", "twine>=6", "pytest>=8", "ruff>=0.12", "mypy>=1.15", "types-simplejson>=4.1", "babel>=2.17", "pyinstaller>=6.15,<7"]
+[tool.setuptools]
+include-package-data = false
 [tool.setuptools.packages.find]
 where = ["src"]
-
+include = ["pydesktools"]
 [tool.setuptools.package-data]
-pydesktools = ['assets/**/*']
+pydesktools = ["py.typed", "bundles/*.pdtplugin", "bundles/*.json", "locales/**/*.mo"]
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+files = ["src/pydesktools", "packages/pydesktools-sdk/src", "packages/pydesktools-runtime/src", "plugins/json-tools/src"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["AppKit", "Foundation", "objc"]
+ignore_missing_imports = true

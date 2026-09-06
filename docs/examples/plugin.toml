@@ -1,0 +1,13 @@
+# Proposed manifest example, not an installable bundle.
+schema = 1
+id = "org.pydesk.json-tools"
+name = "JSON Tools"
+version = "0.1.0"
+distribution = "pydesk-json-tools"
+entrypoint = "pydesk_json_tools:create_plugin"
+requires_python = ">=3.11"
+requires_sdk = ">=0.1,<0.2"
+protocol = 1
+platforms = ["win-amd64", "macos-arm64", "macos-x86_64", "linux-x86_64"]
+languages = ["en", "zh-CN"]
+capabilities = []

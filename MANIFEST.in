@@ -1,0 +1,11 @@
+include CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md CHANGELOG.md THIRD_PARTY_NOTICES.md requirements-dev.lock runtime-source.json
+recursive-include docs *.md *.json *.toml
+recursive-include scripts *.py
+recursive-include licenses *
+recursive-include packages *.py *.toml *.md LICENSE py.typed
+recursive-include plugins *.py *.toml *.md LICENSE py.typed
+prune packages/pydesktools-sdk/build
+prune packages/pydesktools-runtime/build
+prune plugins/json-tools/build
+
+recursive-include locales *.po

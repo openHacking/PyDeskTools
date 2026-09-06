@@ -1,0 +1,2 @@
+pydesktools-sdk<0.2,>=0.1
+simplejson<4,>=3.20

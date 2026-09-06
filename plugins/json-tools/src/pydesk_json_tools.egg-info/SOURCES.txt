@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+src/pydesk_json_tools/__init__.py
+src/pydesk_json_tools/py.typed
+src/pydesk_json_tools.egg-info/PKG-INFO
+src/pydesk_json_tools.egg-info/SOURCES.txt
+src/pydesk_json_tools.egg-info/dependency_links.txt
+src/pydesk_json_tools.egg-info/requires.txt
+src/pydesk_json_tools.egg-info/top_level.txt
+src/pydesk_json_tools/locales/zh_CN/LC_MESSAGES/org.pydesk.json-tools.mo

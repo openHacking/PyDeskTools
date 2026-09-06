@@ -1,0 +1,188 @@
+[
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-1",
+      "method": "initialize",
+      "params": {
+        "session_id": "session-1",
+        "protocol": 1,
+        "plugin_id": "org.pydesk.json-tools",
+        "version": "0.1.0",
+        "locale": "en",
+        "data_dir": "/example/user-data/json-tools/epoch-1",
+        "cache_dir": "/example/cache/json-tools",
+        "import_dir": "/example/session/import",
+        "export_dir": "/example/session/export"
+      }
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-1",
+      "result": {
+        "protocol": 1,
+        "plugin_id": "org.pydesk.json-tools",
+        "version": "0.1.0",
+        "sdk_version": "0.1.0"
+      }
+    }
+  },
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-2",
+      "method": "plugin.activate",
+      "params": {
+        "settings": {},
+        "capabilities": []
+      }
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-2",
+      "result": {}
+    }
+  },
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-3",
+      "method": "plugin.describe",
+      "params": {}
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-3",
+      "result": {
+        "commands": [
+          {
+            "id": "format",
+            "title": "Format JSON",
+            "description": "Pretty-print JSON text",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            "output_schema": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            "effects": "pure",
+            "retry": "safe",
+            "timeout_ms": 30000
+          }
+        ]
+      }
+    }
+  },
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-4",
+      "method": "plugin.invoke",
+      "params": {
+        "task_id": "task-1",
+        "command_id": "format",
+        "arguments": {
+          "text": "{\"a\":1}"
+        }
+      }
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "method": "task.progress",
+      "params": {
+        "task_id": "task-1",
+        "fraction": 1.0,
+        "message": "Formatted"
+      }
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-4",
+      "result": {
+        "data": {
+          "text": "{\n  \"a\": 1\n}"
+        },
+        "view": {
+          "type": "detail",
+          "title": "Formatted JSON",
+          "body": "{\n  \"a\": 1\n}",
+          "format": "code",
+          "actions": []
+        }
+      }
+    }
+  },
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-5",
+      "method": "plugin.deactivate",
+      "params": {
+        "reason": "user_disabled"
+      }
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-5",
+      "result": {}
+    }
+  },
+  {
+    "direction": "host_to_worker",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-6",
+      "method": "shutdown",
+      "params": {}
+    }
+  },
+  {
+    "direction": "worker_to_host",
+    "message": {
+      "jsonrpc": "2.0",
+      "id": "h-6",
+      "result": {}
+    }
+  }
+]

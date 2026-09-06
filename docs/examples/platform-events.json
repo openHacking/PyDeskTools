@@ -1,0 +1,41 @@
+{
+  "fixture_only": true,
+  "description": "Proposed protocol shapes, not a running capture session.",
+  "events": [
+    {
+      "jsonrpc": "2.0",
+      "method": "host.event",
+      "params": {
+        "subscription_id": "sub-1",
+        "event_id": "evt-1",
+        "payload": {
+          "type": "image",
+          "artifact_id": "art-1"
+        }
+      }
+    }
+  ],
+  "view": {
+    "type": "image",
+    "title": "Screenshot",
+    "artifact_id": "art-1",
+    "actions": []
+  },
+  "artifact": {
+    "artifact_id": "art-1",
+    "media_type": "image/png",
+    "width": 640,
+    "height": 480
+  },
+  "unsubscribe": {
+    "jsonrpc": "2.0",
+    "id": "p-9",
+    "method": "host.call",
+    "params": {
+      "capability": "clipboard.unsubscribe",
+      "arguments": {
+        "subscription_id": "sub-1"
+      }
+    }
+  }
+}

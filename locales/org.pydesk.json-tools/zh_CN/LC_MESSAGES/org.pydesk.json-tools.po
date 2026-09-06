@@ -1,0 +1,45 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_CN\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Format JSON"
+msgstr "格式化 JSON"
+
+msgid "Minify JSON"
+msgstr "压缩 JSON"
+
+msgid "Import JSON"
+msgstr "导入 JSON"
+
+msgid "Copy result"
+msgstr "复制结果"
+
+msgid "Export JSON"
+msgstr "导出 JSON"
+
+msgid "JSON result"
+msgstr "JSON 结果"
+
+msgid "Preview truncated; copy or export the complete result."
+msgstr "预览已截断；复制或导出可获取完整结果。"
+
+msgid "Invalid JSON"
+msgstr "JSON 格式错误"
+
+msgid "Duplicate object key"
+msgstr "对象键重复"
+
+msgid "Nonfinite numbers are not JSON"
+msgstr "JSON 不支持非有限数值"
+
+msgid "Nesting exceeds 128"
+msgstr "嵌套超过 128 层"
+
+msgid "Input exceeds 20 MiB"
+msgstr "输入超过 20 MiB"
+
+msgid "Output exceeds 200 MiB"
+msgstr "输出超过 200 MiB"
+

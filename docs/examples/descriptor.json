@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "id": "format",
+      "title": "Format JSON",
+      "description": "Pretty-print JSON text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "effects": "pure",
+      "retry": "safe",
+      "timeout_ms": 30000
+    }
+  ]
+}
