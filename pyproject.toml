@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["pydeskui>=0.2,<0.3", "pydesktools-runtime>=0.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'"]
+dependencies = ["pydeskui>=0.2.2,<0.3", "pydesktools-runtime>=0.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'"]
 [project.scripts]
 pydesktools = "pydesktools.app:main"
 [project.optional-dependencies]
@@ -29,7 +29,7 @@ select = ["E4", "E7", "E9", "F", "I"]
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
-files = ["src/pydesktools", "packages/pydesktools-sdk/src", "packages/pydesktools-runtime/src", "plugins/json-tools/src"]
+files = ["src/pydesktools", "packages/pydesktools-sdk/src", "packages/pydesktools-runtime/src", "plugins/json-tools/src", "plugins/image-compressor/src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

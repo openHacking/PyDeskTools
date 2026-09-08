@@ -36,6 +36,7 @@ python -m pip install -e ../PyDeskUI \
   -e packages/pydesktools-sdk \
   -e packages/pydesktools-runtime \
   -e plugins/json-tools \
+  -e plugins/image-compressor \
   -e '.[dev]'
 python scripts/build_bundles.py
 python -m pydesktools

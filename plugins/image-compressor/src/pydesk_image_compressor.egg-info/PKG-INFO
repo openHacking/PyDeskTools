@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: pydesk-image-compressor
+Version: 0.2.0
+Summary: Offline batch image compression for PyDeskTools
+License-Expression: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: pydesktools-sdk<0.2,>=0.1
+Requires-Dist: Pillow<13,>=11.3
+Dynamic: license-file
+
+# PyDesk Image Compressor
+
+First-party offline JPEG, PNG and WebP batch compression for PyDeskTools.
+Original files are never overwritten. Compressed files are saved beside each
+source image with a `-compressed` suffix, so starting a batch never interrupts
+the workflow with an output-folder prompt.

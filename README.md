@@ -1,23 +1,24 @@
 # PyDeskTools
 
 An offline desktop toolbox with isolated Python plugins. **0.1.0 is experimental.**
-This milestone ships JSON Tools: format/minify, exact integer/decimal handling,
-UTF-8 file import, full-result copy and atomic export. No account or network is
-required at runtime. Screenshot and the other default tools are not implemented yet.
+This milestone ships JSON Tools and Image Compressor as complete offline plugins.
+The routed desktop shell includes a search-first home, an in-app command palette,
+single-sidebar plugin management and categorized settings. No account or network is
+required at runtime. Screenshot and other future tools are not implemented yet.
 
 The macOS arm64 DMG contains the GUI, Tcl/Tk, a separate CPython 3.13 interpreter
-and the complete offline JSON plugin bundle. Drag the app to Applications. An
+and both complete offline plugin bundles. Drag the app to Applications. An
 ad-hoc test build is not Developer ID notarized and is not a public release.
 
 ## Development
 
 The application requires Python 3.13+ with Tk 9 and PyDeskUI 0.2. The default
-offline plugin bundle currently targets CPython 3.13 on macOS arm64. See the
+offline plugin bundles currently target CPython 3.13 on macOS arm64. See the
 [development guide](docs/development.md) for environment setup, editable installs,
 tests, troubleshooting, and launch commands.
 
 `pydesktools` and `python -m pydesktools` share one entrypoint. `--data-dir` selects
-an isolated application profile. The first launch provisions JSON Tools offline.
+an isolated application profile. The first launch provisions both default tools offline.
 Disabled/uninstalled defaults stay that way; Restore explicitly reinstalls the
 shipped version. Installing third-party code requires consent and starts disabled.
 

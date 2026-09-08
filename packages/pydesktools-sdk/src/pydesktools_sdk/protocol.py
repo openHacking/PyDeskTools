@@ -191,7 +191,13 @@ def descriptor(value):
 def validate_view(view, commands):
     if view is None:
         return
-    if not isinstance(view, dict) or view.get("type") not in ("detail", "form", "list", "progress"):
+    if not isinstance(view, dict) or view.get("type") not in (
+        "detail",
+        "form",
+        "list",
+        "progress",
+        "image_compare",
+    ):
         raise ValueError("Unsupported view type in this release")
     for key, value in view.items():
         if isinstance(value, str) and len(value.encode()) > 65536:
@@ -202,6 +208,28 @@ def validate_view(view, commands):
         not isinstance(view.get("body"), str) or view.get("format", "text") not in ("text", "code")
     ):
         raise ValueError("Invalid detail")
+    if view["type"] == "image_compare":
+        allowed = {
+            "type",
+            "title",
+            "before_artifact_id",
+            "after_artifact_id",
+            "metadata",
+            "actions",
+        }
+        if set(view) - allowed:
+            raise ValueError("Invalid image comparison fields")
+        for key in ("before_artifact_id", "after_artifact_id"):
+            if not isinstance(view.get(key), str) or not view[key]:
+                raise ValueError("Image comparison requires artifact IDs")
+        metadata = view.get("metadata", {})
+        if not isinstance(metadata, dict) or len(metadata) > 16:
+            raise ValueError("Invalid image comparison metadata")
+        for key, value in metadata.items():
+            if not isinstance(key, str) or not isinstance(
+                value, (str, int, float, bool, type(None))
+            ):
+                raise ValueError("Invalid image comparison metadata")
     actions = view.get("actions", [])
     if not isinstance(actions, list) or len(actions) > 100:
         raise ValueError("Invalid actions")

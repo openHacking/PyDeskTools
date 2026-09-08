@@ -135,3 +135,378 @@ msgstr "禁用此插件并删除其已保存的数据和设置？"
 
 msgid "Preparing offline JSON tool…"
 msgstr "正在离线配置 JSON 工具…"
+
+msgid "Home"
+msgstr "主页"
+
+msgid "Enabled tools"
+msgstr "已启用工具"
+
+msgid "Plugin center"
+msgstr "插件中心"
+
+msgid "Your everyday tools, one shortcut away"
+msgstr "常用工具，一步直达"
+
+msgid "Search an enabled plugin or command to get started."
+msgstr "搜索已启用的插件或命令，立即开始。"
+
+msgid "Continue working"
+msgstr "继续工作"
+
+msgid "Start from a file"
+msgstr "从文件开始"
+
+msgid "JSON and image files are routed to the right local tool."
+msgstr "JSON 和图片文件会自动交给合适的本地工具。"
+
+msgid "Open file"
+msgstr "打开文件"
+
+msgid "Welcome to PyDeskTools"
+msgstr "欢迎使用 PyDeskTools"
+
+msgid "Find tools and commands quickly, and process data and files efficiently."
+msgstr "快速查找工具与功能，高效处理各类数据和文件"
+
+msgid "Search tools or commands, e.g. format JSON, compress images…"
+msgstr "搜索工具或命令，例如：格式化 JSON、压缩图片…"
+
+msgid "Search tools or commands"
+msgstr "搜索工具或命令"
+
+msgid "Search tools"
+msgstr "搜索工具"
+
+msgid "Find commands"
+msgstr "查找功能命令"
+
+msgid "Two ways to get started"
+msgstr "两种方式开始使用"
+
+msgid "Local mode (offline)"
+msgstr "本地模式（离线）"
+
+msgid "JSON Formatter"
+msgstr "JSON 格式化"
+
+msgid "All processing happens locally. Your data never leaves this device."
+msgstr "所有处理均在本地完成，数据不会离开你的设备。"
+
+msgid "Input (raw JSON)"
+msgstr "输入（原始 JSON）"
+
+msgid "Output (formatted result)"
+msgstr "输出（格式化结果）"
+
+msgid "Line 1, column 1"
+msgstr "行 1，列 1"
+
+msgid "Image Compressor"
+msgstr "图片压缩"
+
+msgid "JSON Tools"
+msgstr "JSON 格式化"
+
+msgid "Your recent local work will appear here."
+msgstr "最近处理的本地任务会显示在这里。"
+
+msgid "Files and command results remain on this device."
+msgstr "文件与命令结果始终保留在此设备上。"
+
+msgid "Compress images efficiently and reduce file size"
+msgstr "高效压缩图片，减小文件体积"
+
+msgid "File queue"
+msgstr "文件队列"
+
+msgid "Preview comparison"
+msgstr "预览对比"
+
+msgid "Search installed plugins"
+msgstr "搜索已安装插件"
+
+msgid "Manage plugins"
+msgstr "管理插件"
+
+msgid "Input"
+msgstr "输入"
+
+msgid "Output"
+msgstr "结果"
+
+msgid "Swap"
+msgstr "交换"
+
+msgid "Clear"
+msgstr "清空"
+
+msgid "Options"
+msgstr "选项"
+
+msgid "Add images"
+msgstr "添加图片"
+
+msgid "Compress images"
+msgstr "开始压缩"
+
+msgid "No images selected"
+msgstr "尚未选择图片"
+
+msgid "images selected"
+msgstr "张图片已选择"
+
+msgid "Images"
+msgstr "图片列表"
+
+msgid "Remove selected"
+msgstr "移除所选图片"
+
+msgid "Preview"
+msgstr "预览"
+
+msgid "A compressed preview will appear automatically"
+msgstr "压缩预览会自动显示在这里"
+
+msgid "Compressed"
+msgstr "压缩后"
+
+msgid "Add one or more JPEG, PNG, or WebP images to begin."
+msgstr "添加一张或多张 JPEG、PNG 或 WebP 图片即可开始。"
+
+msgid "Compressed files are saved beside the originals."
+msgstr "压缩后的文件会保存在原图旁边。"
+
+msgid "Compress"
+msgstr "开始压缩"
+
+msgid "Files"
+msgstr "文件队列"
+
+msgid "Before / After"
+msgstr "压缩前 / 压缩后"
+
+msgid "Choose an image"
+msgstr "请选择图片"
+
+msgid "Preview appears here"
+msgstr "预览将在这里显示"
+
+msgid "Compression settings"
+msgstr "压缩设置"
+
+msgid "Output format"
+msgstr "输出格式"
+
+msgid "Quality"
+msgstr "质量"
+
+msgid "Maximum width"
+msgstr "最大宽度"
+
+msgid "Maximum height"
+msgstr "最大高度"
+
+msgid "Keep metadata"
+msgstr "保留元数据"
+
+msgid "Keep larger results"
+msgstr "保留体积变大的结果"
+
+msgid "JPEG background color"
+msgstr "JPEG 背景色"
+
+msgid "Results"
+msgstr "处理结果"
+
+msgid "Back to home"
+msgstr "返回主页"
+
+msgid "Installed plugins"
+msgstr "已安装插件"
+
+msgid "Plugin details"
+msgstr "插件信息"
+
+msgid "Data and permissions"
+msgstr "数据与权限"
+
+msgid "All"
+msgstr "全部"
+
+msgid "Restore default tools"
+msgstr "恢复默认工具"
+
+msgid "Source"
+msgstr "来源"
+
+msgid "Built in"
+msgstr "内置"
+
+msgid "Local bundle"
+msgstr "本地插件包"
+
+msgid "Capabilities"
+msgstr "能力"
+
+msgid "Runtime status"
+msgstr "运行状态"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Idle"
+msgstr "空闲"
+
+msgid "Data location"
+msgstr "数据位置"
+
+msgid "None"
+msgstr "无"
+
+msgid "Disabling removes this plugin from home, the sidebar, and search."
+msgstr "禁用后，该插件会从主页、侧边栏和搜索中移除。"
+
+msgid "Danger zone"
+msgstr "危险操作"
+
+msgid "General"
+msgstr "常规"
+
+msgid "Storage and logs"
+msgstr "存储与日志"
+
+msgid "About"
+msgstr "关于"
+
+msgid "Show recent work on home"
+msgstr "在主页显示最近工作"
+
+msgid "Press Command-K or Control-K for quick search inside the app."
+msgstr "按 Command-K 或 Control-K 可在应用内快速搜索。"
+
+msgid "Open data directory"
+msgstr "打开数据目录"
+
+msgid "Clear logs"
+msgstr "清理日志"
+
+msgid "License: MIT"
+msgstr "许可证：MIT"
+
+msgid "Third-party notices are included with the application."
+msgstr "第三方声明随应用一并提供。"
+
+msgid "Quick search"
+msgstr "快捷搜索"
+
+msgid "Original"
+msgstr "原始大小"
+
+msgid "Estimated"
+msgstr "预计大小"
+
+msgid "Supported files"
+msgstr "支持的文件"
+
+msgid "All files"
+msgstr "所有文件"
+
+msgid "Old logs cleared"
+msgstr "旧日志已清理"
+
+msgid "No enabled tool supports this file type."
+msgstr "当前没有已启用工具支持这种文件类型。"
+
+msgid "Enable Image Compressor to open image files."
+msgstr "请先启用 Image Compressor 再打开图片。"
+
+msgid "Enable JSON Tools to open JSON files."
+msgstr "请先启用 JSON Tools 再打开 JSON 文件。"
+
+msgid "Choose a tool from the sidebar"
+msgstr "从侧边栏选择工具"
+
+msgid "Select an enabled tool and start working with local data."
+msgstr "选择已启用的工具，开始处理本地数据或文件。"
+
+msgid "Drop or open a supported file"
+msgstr "拖入或打开支持的文件"
+
+msgid "Supported files are routed directly to the right local tool."
+msgstr "支持的文件会直接交给合适的本地工具处理。"
+
+msgid "characters"
+msgstr "字符"
+
+msgid "Waiting"
+msgstr "等待处理"
+
+msgid "Manage installed local tools and their data access."
+msgstr "管理已安装的本地工具及其数据访问。"
+
+msgid "Make PyDeskTools work the way you prefer."
+msgstr "让 PyDeskTools 按你习惯的方式工作。"
+
+msgid "Language and region"
+msgstr "语言与区域"
+
+msgid "Choose the language used throughout the app."
+msgstr "选择应用各处使用的界面语言。"
+
+msgid "Choose the application interface language."
+msgstr "选择应用界面显示的语言。"
+
+msgid "Keep your latest local commands within easy reach."
+msgstr "在首页快速访问最近执行的本地命令。"
+
+msgid "Match the system or choose a fixed color scheme."
+msgstr "跟随系统，或选择固定的配色方案。"
+
+msgid "Control the light and dark appearance of PyDeskTools."
+msgstr "控制 PyDeskTools 的浅色与深色外观。"
+
+msgid "Shortcuts"
+msgstr "快捷键"
+
+msgid "Keyboard shortcuts"
+msgstr "键盘快捷键"
+
+msgid "Fast access without leaving the current task."
+msgstr "无需离开当前任务即可快速访问功能。"
+
+msgid "Global quick search"
+msgstr "全局快捷搜索"
+
+msgid "Open search anywhere inside PyDeskTools."
+msgstr "在 PyDeskTools 任意界面打开搜索。"
+
+msgid "Plugin sources"
+msgstr "插件来源"
+
+msgid "This release installs local bundles only."
+msgstr "当前版本仅安装本地插件包。"
+
+msgid "Offline source"
+msgstr "离线来源"
+
+msgid "Plugins are installed from local signed or approved bundles."
+msgstr "插件从本地已签名或经确认的插件包安装。"
+
+msgid "Inspect local data or clear diagnostic logs."
+msgstr "查看本地数据或清理诊断日志。"
+
+msgid "Application data"
+msgstr "应用数据"
+
+msgid "Diagnostic logs"
+msgstr "诊断日志"
+
+msgid "Remove locally stored application logs."
+msgstr "移除本地保存的应用日志。"
+
+msgid "Version and legal information."
+msgstr "版本与法律信息。"
+
+msgid "Local-first desktop tools powered by isolated plugins."
+msgstr "由隔离插件驱动的本地优先桌面工具。"

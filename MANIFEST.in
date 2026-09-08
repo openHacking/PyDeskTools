@@ -7,5 +7,6 @@ recursive-include plugins *.py *.toml *.md LICENSE py.typed
 prune packages/pydesktools-sdk/build
 prune packages/pydesktools-runtime/build
 prune plugins/json-tools/build
+prune plugins/image-compressor/build
 
 recursive-include locales *.po

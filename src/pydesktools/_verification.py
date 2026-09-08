@@ -7,6 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 
 PLUGIN = "org.pydesk.json-tools"
+IMAGE_PLUGIN = "org.pydesk.image-compressor"
 
 
 def start(app, destination, started):
@@ -22,6 +23,13 @@ def start(app, destination, started):
             }
             try:
                 services = app.services
+                image_record = services.store.get(IMAGE_PLUGIN)
+                assert image_record and image_record["enabled"]
+                assert {command["id"] for command in image_record["descriptor"]["commands"]} == {
+                    "import_images",
+                    "preview",
+                    "compress",
+                }
                 first = services.commands.submit(
                     PLUGIN,
                     "format",
@@ -61,6 +69,21 @@ def start(app, destination, started):
                     ]
                     == "{}"
                 )
+                image_worker = services._workers.get(IMAGE_PLUGIN)
+                services.disable(IMAGE_PLUGIN)
+                if image_worker:
+                    assert image_worker.process.poll() is not None
+                services.uninstall(IMAGE_PLUGIN)
+                assert services.store.decision(IMAGE_PLUGIN) == "uninstalled"
+                services.install(
+                    Path(
+                        str(files("pydesktools").joinpath("bundles", "image-compressor.pdtplugin"))
+                    ),
+                    consent=True,
+                    official=True,
+                )
+                restored_image = services.store.get(IMAGE_PLUGIN)
+                assert restored_image and restored_image["enabled"]
                 report["passed"] = True
             except Exception as error:
                 report["passed"] = False

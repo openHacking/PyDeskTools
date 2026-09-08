@@ -94,7 +94,10 @@ class PlatformAdapter:
             self._panel = None
             try:
                 cancellation.raise_if_cancelled()
-                response.set_result(str(value) if value else None)
+                if capability == "dialogs.open_files":
+                    response.set_result(list(value or ()))
+                else:
+                    response.set_result(str(value) if value else None)
             except BaseException as error:
                 response.set_exception(error)
 
@@ -118,28 +121,51 @@ class PlatformAdapter:
                     Path(arguments.get("suggested_name", "output.json")).name
                 )
             else:
-                panel.setCanChooseDirectories_(False)
-                panel.setAllowsMultipleSelection_(False)
+                choose_directory = capability == "dialogs.choose_directory"
+                panel.setCanChooseDirectories_(choose_directory)
+                panel.setCanChooseFiles_(not choose_directory)
+                panel.setAllowsMultipleSelection_(capability == "dialogs.open_files")
             self._dialog_token = cancellation
             self._panel = panel
             self._finish_dialog = completed
 
             def finished(result):
-                completed(panel.URL().path() if result == NSModalResponseOK else None)
+                if result != NSModalResponseOK:
+                    completed([] if capability == "dialogs.open_files" else None)
+                elif capability == "dialogs.open_files":
+                    completed([str(url.path()) for url in panel.URLs()])
+                else:
+                    completed(panel.URL().path())
 
             panel.beginSheetModalForWindow_completionHandler_(parent, finished)
             self.scheduler.call_later(50, self._watch_dialog)
         else:
-            value = (
-                filedialog.askopenfilename(parent=self.root, title=arguments.get("title", "Open"))
-                if capability == "dialogs.open_file"
-                else filedialog.asksaveasfilename(
-                    parent=self.root,
-                    title=arguments.get("title", "Save"),
-                    initialfile=Path(arguments.get("suggested_name", "output.json")).name,
-                    confirmoverwrite=True,
+            if capability == "dialogs.open_files":
+                value = list(
+                    filedialog.askopenfilenames(
+                        parent=self.root, title=arguments.get("title", "Open")
+                    )
                 )
-            )
+            elif capability == "dialogs.choose_directory":
+                value = (
+                    filedialog.askdirectory(
+                        parent=self.root, title=arguments.get("title", "Choose folder")
+                    )
+                    or None
+                )
+            else:
+                value = (
+                    filedialog.askopenfilename(
+                        parent=self.root, title=arguments.get("title", "Open")
+                    )
+                    if capability == "dialogs.open_file"
+                    else filedialog.asksaveasfilename(
+                        parent=self.root,
+                        title=arguments.get("title", "Save"),
+                        initialfile=Path(arguments.get("suggested_name", "output.json")).name,
+                        confirmoverwrite=True,
+                    )
+                )
             completed(value)
 
     def drain(self):
@@ -153,7 +179,12 @@ class PlatformAdapter:
             return
         try:
             cancellation.raise_if_cancelled()
-            if capability in ("dialogs.open_file", "dialogs.save_file"):
+            if capability in (
+                "dialogs.open_file",
+                "dialogs.open_files",
+                "dialogs.choose_directory",
+                "dialogs.save_file",
+            ):
                 if capability == "dialogs.save_file":
                     artifacts.path(plugin, arguments["artifact_id"])
                 self._choose(capability, arguments, cancellation, response)

@@ -1,6 +1,6 @@
 # Application architecture and composition API
 
-> Revised design: 2026-09-04; source audit: 2026-09-03 · Source revision: `c0918e8` · Target design, not implemented behavior.
+> Updated: 2026-09-06. The shell, JSON Tools, and Image Compressor sections describe implemented behavior; later roadmap plugins remain proposals.
 
 ## Dependency direction
 
@@ -75,8 +75,18 @@ Use the Tk main thread for view/controller state; a bounded background service e
 
 Process events carry session ID and task ID. UI adapters discard events from old sessions after disable, update or crash. Workers never call Tk methods. A bounded queue coalesces progress events; terminal events are not dropped. Queue saturation causes an explicit worker error rather than unlimited memory growth.
 
-## First-party plugins
+## Routed shell and first-party plugins
 
-Ship Screenshot, JSON Formatter, Image Compressor, Timestamp Converter and Clipboard History as ordinary first-party plugins with complete offline bundles. The [default-tool specification](bundled-tools.md) owns their scope and provisioning rules. Regex and file hashing remain optional SDK examples; the regex fixture keeps a bounded timeout. [Platform/artifact contracts](platform-and-artifacts.md) define capture, subscriptions and image data flow.
+The host uses explicit `home`, `tool(plugin_id)`, `plugins`, and `settings` routes.
+Home/tool routes share one 240px tool sidebar. Plugin management and settings replace
+that shell with their own standalone sidebar, so two navigation containers are never
+mounted at once. `Command-K`/`Control-K` opens the local command index from every route.
+
+JSON Tools and Image Compressor ship as ordinary first-party plugins with complete
+offline bundles. Image Compressor supports validated JPEG/PNG/WebP batch input,
+orientation-aware resizing, metadata control, before/after artifacts, atomic outputs,
+cancellation cleanup and default rejection of larger results. The [default-tool
+specification](bundled-tools.md) owns broader future scope. Screenshot, Timestamp
+Converter and Clipboard History remain roadmap work.
 
 No plugin manager logic, catalog knowledge, license state or command schema belongs in PyDeskUI. Generic controls are requested upstream as independent primitives and consumed through released package versions.

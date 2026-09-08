@@ -91,9 +91,9 @@ class WorkerProcess:
             self.call(
                 "plugin.activate",
                 {"settings": {}, "allowed_capabilities": manifest["capabilities"]},
-                timeout=5,
+                timeout=15,
             )
-            self.descriptor = self.call("plugin.describe", {}, timeout=5)
+            self.descriptor = self.call("plugin.describe", {}, timeout=15)
         except BaseException:
             self.stop(force=True)
             raise

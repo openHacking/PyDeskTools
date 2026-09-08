@@ -13,29 +13,112 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from tkinter import filedialog
-from typing import Protocol
+from tkinter import font as tkfont
+from typing import Any, Protocol
 
 from pydesktools_runtime import CloseHandle, RuntimeConfig, create_services
 from pydesktools_sdk import CancellationToken
 from pydeskui import (
+    CommandPalette,
     Dialog,
-    FieldSpec,
     Frame,
+    Icon,
     Item,
+    Label,
     ProgressView,
     Scheduler,
-    Tabs,
+    SearchEntry,
+    Separator,
+    Surface,
     Theme,
     Toast,
+    Toolbar,
     TranslationContext,
 )
 
 from .platform import PlatformAdapter
-from .ui import JSONToolView, PluginManagerView, SettingsView, fields_for_schema
+from .ui import (
+    GenericToolView,
+    HomeView,
+    ImageCompressorView,
+    JSONToolView,
+    PluginManagerView,
+    SettingsView,
+    ToolSidebar,
+    fields_for_schema,
+)
 
 PLUGIN = "org.pydesk.json-tools"
+IMAGE_PLUGIN = "org.pydesk.image-compressor"
+DEFAULT_PLUGINS = {
+    PLUGIN: "json-tools.pdtplugin",
+    IMAGE_PLUGIN: "image-compressor.pdtplugin",
+}
+DEFAULT_PLUGIN_VERSIONS = {PLUGIN: "0.1.0", IMAGE_PLUGIN: "0.2.0"}
 LANGUAGE_PREFERENCES = ("system", "en", "zh-CN")
 THEME_PREFERENCES = ("system", "light", "dark")
+
+
+def application_font(root):
+    """Pick the closest installed system UI family without bundling a font."""
+    installed = set(tkfont.families(root))
+    candidates = {
+        "darwin": ("SF Pro Text", "SF Pro Display", "Helvetica Neue"),
+        "win32": ("Segoe UI Variable", "Segoe UI"),
+    }.get(sys.platform, ("Noto Sans CJK SC", "Noto Sans", "DejaVu Sans"))
+    return next((name for name in candidates if name in installed), "TkDefaultFont")
+
+
+def application_tokens(mode):
+    if mode == "dark":
+        return {
+            "background": "#111720",
+            "foreground": "#F4F7FB",
+            "card": "#171F2A",
+            "card_foreground": "#F4F7FB",
+            "popover": "#171F2A",
+            "popover_foreground": "#F4F7FB",
+            "secondary": "#202B38",
+            "secondary_foreground": "#F4F7FB",
+            "muted": "#202B38",
+            "muted_foreground": "#9BA8B8",
+            "accent": "#213A5D",
+            "accent_foreground": "#DCEBFF",
+            "border": "#2A3442",
+            "input": "#35465A",
+            "sidebar": "#151D27",
+            "sidebar_foreground": "#F4F7FB",
+            "sidebar_accent": "#213A5D",
+            "sidebar_accent_foreground": "#DCEBFF",
+            "sidebar_border": "#2B394A",
+            "destructive": "#E5484D",
+            "primary_foreground": "#FFFFFF",
+            "sidebar_primary_foreground": "#FFFFFF",
+        }
+    return {
+        "background": "#F7F9FC",
+        "foreground": "#151922",
+        "card": "#FFFFFF",
+        "card_foreground": "#151922",
+        "popover": "#FFFFFF",
+        "popover_foreground": "#151922",
+        "secondary": "#F1F5FA",
+        "secondary_foreground": "#151922",
+        "muted": "#F1F5FA",
+        "muted_foreground": "#687386",
+        "accent": "#EAF3FF",
+        "accent_foreground": "#1264D1",
+        "border": "#E8ECF2",
+        "input": "#CDD5E0",
+        "sidebar": "#F7F9FC",
+        "sidebar_foreground": "#151922",
+        "sidebar_accent": "#EAF3FF",
+        "sidebar_accent_foreground": "#1264D1",
+        "sidebar_border": "#E8ECF2",
+        "destructive": "#D92D20",
+        "primary_foreground": "#FFFFFF",
+        "sidebar_primary_foreground": "#FFFFFF",
+    }
 
 
 def preferred_locale():
@@ -146,8 +229,8 @@ class Application:
         self.config = config
         self.root = tk.Tk()
         self.root.title(config.display_name)
-        self.root.geometry("1080x780")
-        self.root.minsize(740, 600)
+        self.root.geometry("1280x840")
+        self.root.minsize(960, 680)
         self.platform = PlatformAdapter(self.root)
         self.services = create_services(
             RuntimeConfig(
@@ -170,13 +253,20 @@ class Application:
         self.theme_preference = self.services.store.setting("host", "theme", "system")
         if self.theme_preference not in THEME_PREFERENCES:
             self.theme_preference = "system"
+        resolved_mode = (
+            preferred_theme(self.root)
+            if self.theme_preference == "system"
+            else self.theme_preference
+        )
         self.theme = Theme(
             self.root,
-            mode=(
-                preferred_theme(self.root)
-                if self.theme_preference == "system"
-                else self.theme_preference
-            ),
+            mode=resolved_mode,
+            accent="#1677FF",
+            tokens=application_tokens(resolved_mode),
+            radius=8,
+            density="comfortable",
+            font_family=application_font(self.root),
+            font_size=14,
             translator=TranslationContext(self.locale),
         )
         self.scheduler = Scheduler(self.root)
@@ -185,11 +275,19 @@ class Application:
         self.progress_event = None
         self.subscription = self.services.tasks.subscribe(self._event)
         self.task = None
+        self.current_page = "home"
         self.current_plugin = PLUGIN
         self.current_command = "format"
         self.json_values = None
+        self.form: Any = None
+        self.generic_view = None
+        self.recent_enabled = bool(self.services.store.setting("host", "recent_enabled", True))
+        recent = self.services.store.setting("host", "recent_commands", [])
+        self.recent_commands = recent if isinstance(recent, list) else []
         self.result_task = None
         self.result_artifact = None
+        self.result_artifacts = []
+        self.image_preview_pending = False
         self.closing = False
         self.background_busy = False
         self.busy_visible = False
@@ -216,6 +314,15 @@ class Application:
             ),
         ]
         self._build()
+        self._key_bindings = [
+            ("<Control-k>", self.root.bind("<Control-k>", self.show_command_palette, add="+")),
+            ("<Command-k>", self.root.bind("<Command-k>", self.show_command_palette, add="+")),
+            ("<Alt-Left>", self.root.bind("<Alt-Left>", self.go_home, add="+")),
+            (
+                "<Command-bracketleft>",
+                self.root.bind("<Command-bracketleft>", self.go_home, add="+"),
+            ),
+        ]
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         if sys.platform == "darwin":
             self.root.tk.createcommand("::tk::mac::Quit", self.close)
@@ -236,64 +343,219 @@ class Application:
                     self._translator = gettext.GNUTranslations(stream)
         return self._translator.gettext(text)
 
-    def _build(self, values=None):
-        self.notebook = Tabs(self.root, theme=self.theme)
-        self.notebook.pack(fill="both", expand=True, padx=16, pady=12)
-        self.tools = JSONToolView(
-            self.notebook,
-            fields=[
-                FieldSpec("text", self.t("JSON input"), "multiline", default='{"hello": "世界"}'),
-                FieldSpec("indent", self.t("Indent"), "integer", default=2),
-                FieldSpec("sort_keys", self.t("Sort keys"), "boolean", default=False),
-            ],
+    def _build(self, values=None, image_files=None):
+        self.app_frame = Surface(self.root, role="background", theme=self.theme)
+        self.app_frame.pack(fill="both", expand=True)
+
+        self.workspace_shell = Surface(self.app_frame, role="background", theme=self.theme)
+        self.header = Toolbar(self.workspace_shell, theme=self.theme, height=64, padding=(18, 10))
+        self.header.pack(fill="x")
+        self.header.pack_propagate(False)
+        brand = Surface(self.header, role="background", width=170, theme=self.theme)
+        brand.pack(side="left", fill="y")
+        brand.pack_propagate(False)
+        Icon(
+            brand,
+            name="plugin",
+            size=30,
+            color=self.theme.tokens["primary"],
+            background=self.root.cget("background"),
+            theme=self.theme,
+        ).pack(side="left", pady=7)
+        Label(
+            brand,
+            text="PyDeskTools",
+            variant="section",
+            surface="background",
+            theme=self.theme,
+        ).pack(side="left", padx=(10, 0), pady=7)
+        search_host = Surface(self.header, role="background", theme=self.theme)
+        search_host.pack(side="left", fill="x", expand=True, padx=(16, 160))
+        self.header_search = SearchEntry(
+            search_host,
+            on_change=self._header_changed,
+            placeholder=self.t("Search tools or commands"),
+            shortcut_hint="⌘ K",
+            theme=self.theme,
+            width=42,
+        )
+        self.header_search.pack(fill="x", pady=2)
+        self.workspace = Surface(self.workspace_shell, role="background", theme=self.theme)
+        self.workspace.pack(fill="both", expand=True)
+        self.sidebar = ToolSidebar(
+            self.workspace, translate=self.t, on_navigate=self.navigate, theme=self.theme
+        )
+        self.sidebar.pack(side="left", fill="y")
+        Separator(self.workspace, orient="vertical", theme=self.theme).pack(side="left", fill="y")
+        self.workspace_content = Surface(self.workspace, role="background", theme=self.theme)
+        self.workspace_content.pack(side="left", fill="both", expand=True)
+
+        self.home = HomeView(
+            self.workspace_content,
             translate=self.t,
-            on_search=self._search,
+            on_search=self._home_changed,
             on_select=self.select_command,
-            on_command=self.run_command,
+            on_open_file=self.open_file,
+            on_open_plugins=lambda: self.navigate("plugins"),
             theme=self.theme,
         )
-        self.plugins = PluginManagerView(
-            self.notebook,
+        self.tools_host = Frame(self.workspace_content, theme=self.theme)
+        self.json_tool = JSONToolView(
+            self.tools_host, translate=self.t, on_command=self.run_command, theme=self.theme
+        )
+        self.image_tool = ImageCompressorView(
+            self.tools_host,
             translate=self.t,
+            on_command=self.run_command,
+            on_preview=self.request_image_preview,
+            theme=self.theme,
+        )
+        if values:
+            self.json_tool.form.set_values(values)
+        if image_files:
+            self.image_tool.set_files(image_files)
+
+        self.plugins = PluginManagerView(
+            self.app_frame,
+            translate=self.t,
+            on_home=lambda: self.navigate("home"),
             on_install=self.install_local,
             on_restore=lambda: self._provision(restore=True),
             on_manage=self.manage,
             theme=self.theme,
-            bundled_plugin_id=PLUGIN,
+            bundled_plugin_ids=DEFAULT_PLUGINS,
+            data_root=self.services.store.root,
         )
         self.settings = SettingsView(
-            self.notebook,
+            self.app_frame,
             translate=self.t,
             language_preference=self.locale_preference,
             mode_preference=self.theme_preference,
+            recent_enabled=self.recent_enabled,
+            on_home=lambda: self.navigate("home"),
             on_language=self.change_language,
             on_mode=self.change_theme,
+            on_recent=self.change_recent,
+            on_open_data=self.open_data_directory,
+            on_clear_logs=self.clear_logs,
+            data_path=self.services.store.root,
+            version=self.config.version,
             theme=self.theme,
         )
-        for name, panel in (
-            ("Tools", self.tools),
-            ("Plugins", self.plugins),
-            ("Settings", self.settings),
-        ):
-            self.notebook.add(panel, text=self.t(name))
-        self.tool_list = self.tools.tool_list
-        self.form = self.tools.form
-        self.actions = self.tools.input_actions
-        self.command_buttons = self.tools.command_buttons
-        self.detail = self.tools.detail
         self.plugin_list = self.plugins.plugin_list
         self.language_var = self.settings.language_var
         self.mode_var = self.settings.mode_var
-        if values:
-            self.form.set_values(values)
-        self.progress = ProgressView(self.root, on_cancel=self.cancel, theme=self.theme)
-        self.progress.pack(fill="x", padx=16, pady=(0, 8))
-        self.progress.update_progress(0, self.t("Ready"))
-        for identifier, factory in self.services.views.factories.items():
-            extension_panel = Frame(self.notebook, theme=self.theme)
-            self.notebook.add(extension_panel, text=identifier)
-            factory(extension_panel)
+        self.form = self.json_tool.form
+        self.actions = self.json_tool.input_actions
+        self.command_buttons = self.json_tool.command_buttons
+        self.detail: Any = self.json_tool.detail
+
+        self.progress = ProgressView(self.app_frame, on_cancel=self.cancel, theme=self.theme)
+        self.progress.update_progress(0, self.t("Working…"))
+        self.palette = CommandPalette(
+            self.root,
+            title=self.t("Quick search"),
+            on_search=self._palette_changed,
+            on_select=self.select_command,
+            theme=self.theme,
+        )
+        self.palette_search = self.palette.search
+        self.palette_results = self.palette.results
+        self.palette_results.tree.configure(height=8)
+        self.navigate(self.current_page, self.current_plugin)
         self.refresh()
+
+    def navigate(self, page, plugin_id=None):
+        if page == "tool" and plugin_id:
+            record = self.services.store.get(plugin_id)
+            if not record or not record["enabled"]:
+                page = "home"
+            else:
+                self.current_plugin = plugin_id
+        self.current_page = page
+        for panel in (self.workspace_shell, self.plugins, self.settings):
+            panel.pack_forget()
+        if page == "home":
+            self.workspace_shell.pack(fill="both", expand=True)
+            self.tools_host.pack_forget()
+            self.home.pack(fill="both", expand=True)
+        elif page == "tool":
+            self.workspace_shell.pack(fill="both", expand=True)
+            self.home.pack_forget()
+            self.tools_host.pack(fill="both", expand=True)
+            self._show_tool(self.current_plugin)
+        elif page == "plugins":
+            self.plugins.pack(fill="both", expand=True)
+        else:
+            self.settings.pack(fill="both", expand=True)
+        self.refresh()
+        if page == "tool" and self.current_plugin == IMAGE_PLUGIN and self.image_preview_pending:
+            self.scheduler.call_later(0, self.request_image_preview)
+
+    def _show_tool(self, plugin_id):
+        for tool_panel in (self.json_tool, self.image_tool):
+            tool_panel.pack_forget()
+        if self.generic_view is not None:
+            self.generic_view.destroy()
+            self.generic_view = None
+        record = self.services.store.get(plugin_id)
+        active_panel: Frame
+        if plugin_id == PLUGIN:
+            active_panel = self.json_tool
+            self.current_command = "format"
+            self.form, self.detail = self.json_tool.form, self.json_tool.detail
+        elif plugin_id == IMAGE_PLUGIN:
+            active_panel = self.image_tool
+            self.current_command = "import_images"
+            self.detail = self.image_tool.result
+        else:
+            command = record["descriptor"]["commands"][0]
+            self.current_command = command["id"]
+            self.generic_view = GenericToolView(
+                self.tools_host,
+                fields=fields_for_schema(command["input_schema"]),
+                title=command["title"],
+                on_run=lambda: self.run_command(self.current_command),
+                theme=self.theme,
+            )
+            active_panel = self.generic_view
+            self.form, self.detail = self.generic_view.form, self.generic_view.detail
+        active_panel.pack(fill="both", expand=True)
+
+    def _home_changed(self, value):
+        self._search(value, self.home.results)
+
+    def _header_changed(self, value):
+        if hasattr(self, "palette_results"):
+            self._search(value, self.palette_results)
+
+    def _palette_changed(self, value):
+        self._search(value, self.palette_results)
+
+    def go_home(self, _event=None):
+        if self.current_page != "home":
+            self.navigate("home")
+            return "break"
+        return None
+
+    def show_command_palette(self, _event=None):
+        self.palette.show()
+        self.palette_search.delete(0, "end")
+        self._search("", self.palette_results)
+        self.palette_search.focus_set()
+        return "break"
+
+    def _palette_down(self, _event):
+        children = self.palette_results.tree.get_children()
+        if children:
+            self.palette_results.tree.selection_set(children[0])
+            self.palette_results.tree.focus(children[0])
+            self.palette_results.tree.focus_set()
+        return "break"
+
+    def _palette_accept(self, _event):
+        self.select_command(self.palette_results.selected_id())
+        return "break"
 
     def _event(self, event):
         if event["type"] == "progress":
@@ -313,6 +575,7 @@ class Application:
         if self.closing or not (self.task or self.background_busy):
             return
         self.busy_visible = True
+        self.progress.place(relx=0, rely=1, anchor="sw", relwidth=1)
         self.progress.update_progress(0, self.t("Working…"))
         self.refresh()
 
@@ -324,7 +587,7 @@ class Application:
             self.busy_handle = None
         self.busy_visible = False
         self.active_action = None
-        self.progress.update_progress(1, self.t("Ready"))
+        self.progress.place_forget()
         self.refresh()
 
     def _poll(self):
@@ -390,13 +653,22 @@ class Application:
                                 self.services.artifacts.release("result:" + self.result_task)
                             self.result_task = self.task.id
                             self.result_artifact = result["data"]["artifact_id"]
+                        data = result["data"]
                         view = result.get("view")
-                        if view:
+                        if completed_action == "import_images" and "files" in data:
+                            self.image_tool.set_files(item["path"] for item in data["files"])
+                        elif completed_action == "preview" and view:
+                            self._show_image_preview(data, view)
+                        elif view and view.get("type") == "detail":
                             self.detail.set_content(
                                 view["title"], view.get("body", ""), view.get("format", "text")
                             )
+                            if self.current_plugin == PLUGIN:
+                                self.json_tool.output_badge.configure(text=self.t("Formatted"))
                         if completed_action == "copy":
                             self.toast.show(text=self.t("Copied to clipboard"))
+                        if completed_action not in ("copy", "export"):
+                            self._remember(self.current_plugin, completed_action)
                     else:
                         failure = event["error"]
                         data = failure.get("data", {})
@@ -406,9 +678,55 @@ class Application:
                             else ""
                         )
                         self.detail.set_content(self.t("Error"), failure["message"] + suffix)
+                        if self.current_plugin == PLUGIN:
+                            self.json_tool.output_badge.configure(text=self.t("Error"))
                     self.task = None
                     self._settle_busy_feedback()
+                    if self.image_preview_pending:
+                        self.scheduler.call_later(0, self.request_image_preview)
         self.scheduler.call_later(25, self._poll)
+
+    def request_image_preview(self):
+        """Coalesce selection and setting changes into the latest useful preview."""
+        if not self.image_tool.files or not self.image_tool.selected_path:
+            self.image_preview_pending = False
+            return
+        self.image_preview_pending = True
+        if (
+            self.task
+            or self.background_busy
+            or self.current_page != "tool"
+            or self.current_plugin != IMAGE_PLUGIN
+        ):
+            return
+        self.image_preview_pending = False
+        self.run_command("preview")
+
+    def _show_image_preview(self, data, view):
+        self.services.artifacts.release("image-preview")
+        self.result_artifacts = [data["before_artifact_id"], data["after_artifact_id"]]
+        paths = []
+        for identifier in self.result_artifacts:
+            self.services.artifacts.acquire(IMAGE_PLUGIN, identifier, "image-preview")
+            paths.append(self.services.artifacts.path(IMAGE_PLUGIN, identifier))
+        metadata = view.get("metadata", {})
+        summary = self.t("Original") + f": {metadata.get('original_bytes', 0):,} B\n"
+        summary += self.t("Estimated") + f": {metadata.get('estimated_bytes', 0):,} B\n"
+        summary += f"{metadata.get('width', 0)} × {metadata.get('height', 0)} px"
+        self.image_tool.show_preview(paths[0], paths[1], summary)
+
+    def _remember(self, plugin_id, command_id):
+        import time
+
+        entry = {"plugin_id": plugin_id, "command_id": command_id, "time": int(time.time())}
+        self.recent_commands = [
+            item
+            for item in self.recent_commands
+            if (item.get("plugin_id"), item.get("command_id")) != (plugin_id, command_id)
+        ]
+        self.recent_commands.insert(0, entry)
+        self.recent_commands = self.recent_commands[:10]
+        self.services.store.set_setting("host", "recent_commands", self.recent_commands)
 
     def _background(self, callback):
         if self.background_busy or self.closing:
@@ -429,98 +747,184 @@ class Application:
         self.jobs.submit(work)
 
     def _provision(self, restore=False):
-        if not restore and self.services.store.decision(PLUGIN) is not None:
-            return
-        resource = files("pydesktools").joinpath("bundles", "json-tools.pdtplugin")
-        if not resource.is_file():
-            self.progress.update_progress(
-                0, "Offline bundle missing; build the distribution first."
+        pending = []
+        bundle_root = files("pydesktools").joinpath("bundles")
+        for identifier, filename in DEFAULT_PLUGINS.items():
+            decision = self.services.store.decision(identifier)
+            record = self.services.store.get(identifier)
+            if restore and record:
+                continue
+            needs_update = bool(
+                record
+                and decision in ("enabled", "disabled")
+                and record["manifest"]["version"] != DEFAULT_PLUGIN_VERSIONS[identifier]
             )
+            if restore or decision is None or needs_update:
+                resource = bundle_root.joinpath(filename)
+                if resource.is_file():
+                    pending.append(
+                        (
+                            "update" if needs_update else "install",
+                            identifier,
+                            filename,
+                            resource,
+                            decision,
+                        )
+                    )
+        if not pending:
             return
 
         def install():
-            inventory = json.loads(
-                files("pydesktools").joinpath("bundles", "inventory.json").read_text()
-            )
-            if (
-                hashlib.sha256(resource.read_bytes()).hexdigest()
-                != inventory["json-tools.pdtplugin"]
-            ):
-                raise ValueError("Bundled plugin integrity check failed")
-            self.services.install(
-                Path(str(resource)), consent=True, official=True, token=self.background_token
-            )
+            import time
+
+            inventory = json.loads(bundle_root.joinpath("inventory.json").read_text())
+            for operation, identifier, filename, resource, previous_decision in pending:
+                assert resource is not None
+                if hashlib.sha256(resource.read_bytes()).hexdigest() != inventory[filename]:
+                    raise ValueError("Bundled plugin integrity check failed")
+                if operation == "update":
+                    self.services.uninstall(identifier)
+                for attempt in range(2):
+                    try:
+                        self.services.install(
+                            Path(str(resource)),
+                            consent=True,
+                            official=True,
+                            token=self.background_token,
+                        )
+                        break
+                    except Exception as exc:
+                        if attempt:
+                            raise RuntimeError(f"{identifier}: {exc}") from exc
+                        time.sleep(0.1)
+                if operation == "update" and previous_decision == "disabled":
+                    self.services.disable(identifier)
             self.services.store.set_setting("host", "default_provisioning_completed", True)
 
         self._background(install)
 
     def refresh(self):
         records = self.services.store.all()
+        enabled = [record for record in records if record["enabled"]]
         self.plugins.set_records(records)
+        self.plugins.set_running(self.services._workers)
         self.plugins.set_busy(self.busy_visible)
-        self._search("")
+        self.sidebar.set_records(
+            enabled,
+            current_plugin=self.current_plugin,
+            page=self.current_page,
+        )
+        self._search(self.home.search.get(), self.home.results)
+        self._refresh_recent(enabled)
         record = self.services.store.get(self.current_plugin)
         ready = bool(record and record["enabled"])
-        for index, button in enumerate(self.command_buttons):
-            usable = (
-                ready
-                and not self.busy_visible
-                and (index < 3 or self.result_artifact is not None)
-            )
+        if self.current_page == "tool" and not ready:
+            self.cancel()
+            self.navigate("home")
+            return
+        for name, button in self.json_tool.buttons.items():
+            usable = ready and not self.busy_visible
+            if name in ("copy", "export", "swap"):
+                usable = usable and self.result_artifact is not None
+            button.state(["!disabled"] if usable else ["disabled"])
+        for name, button in self.image_tool.buttons.items():
+            usable = ready and not self.busy_visible
+            if name == "compress":
+                usable = usable and bool(self.image_tool.files)
             button.state(["!disabled"] if usable else ["disabled"])
 
-    def _search(self, text):
-        items = []
+    @staticmethod
+    def _normalized(value):
+        return " ".join(value.casefold().replace("_", " ").replace("-", " ").split())
+
+    def _search(self, text, target):
+        query = self._normalized(text)
+        scored = []
+        recent_order = {
+            f"{entry.get('plugin_id')}:{entry.get('command_id')}": index
+            for index, entry in enumerate(self.recent_commands)
+        }
         for record in self.services.store.all():
             if not record["enabled"]:
                 continue
+            plugin_text = self._normalized(record["id"] + " " + record["manifest"]["name"])
             for command in record["descriptor"]["commands"]:
-                if record["id"] == PLUGIN and command["id"] != "format":
+                identifier = record["id"] + ":" + command["id"]
+                if not query and identifier not in recent_order:
                     continue
-                searchable = (
-                    record["id"] + " " + command["id"] + " " + command["title"]
-                ).casefold()
-                if text.casefold() in searchable:
-                    items.append(
+                command_text = self._normalized(
+                    command["id"] + " " + command["title"] + " " + command.get("description", "")
+                )
+                haystack = plugin_text + " " + command_text
+                tokens = query.split()
+                if query and not all(token in haystack for token in tokens):
+                    continue
+                score = sum(
+                    3
+                    if command_text.startswith(token)
+                    else 2
+                    if plugin_text.startswith(token)
+                    else 1
+                    for token in tokens
+                )
+                scored.append(
+                    (
+                        score,
                         Item(
-                            record["id"] + ":" + command["id"],
+                            identifier,
                             command["title"],
                             record["manifest"]["name"],
-                        )
+                        ),
                     )
-        self.tool_list.set_items(items)
+                )
+        if not query:
+            scored.sort(key=lambda pair: recent_order[pair[1].id])
+        else:
+            scored.sort(key=lambda pair: (-pair[0], pair[1].title.casefold()))
+        target.set_items([item for _score, item in scored[:20]])
+
+    def _refresh_recent(self, enabled):
+        enabled_ids = {record["id"] for record in enabled}
+        valid = []
+        items = []
+        for entry in self.recent_commands:
+            if entry.get("plugin_id") not in enabled_ids:
+                continue
+            record = self.services.store.get(entry["plugin_id"])
+            command = next(
+                (
+                    item
+                    for item in record["descriptor"]["commands"]
+                    if item["id"] == entry.get("command_id")
+                ),
+                None,
+            )
+            if command:
+                valid.append(entry)
+                items.append(
+                    Item(
+                        entry["plugin_id"] + ":" + entry["command_id"],
+                        command["title"],
+                        record["manifest"]["name"],
+                    )
+                )
+        if valid != self.recent_commands:
+            self.recent_commands = valid[:10]
+            self.services.store.set_setting("host", "recent_commands", self.recent_commands)
+        self.home.set_recent(items[:10] if self.recent_enabled else [])
 
     def select_command(self, identifier):
         if not identifier or self.task or self.background_busy:
             return
         plugin, command = identifier.split(":", 1)
-        if (plugin, command) == (self.current_plugin, self.current_command):
-            return
         try:
-            if self.current_plugin == PLUGIN:
-                self.json_values = self.form.get_values()
+            self.navigate("tool", plugin)
+            self.current_command = command
+            self.palette.hide()
             if plugin == PLUGIN:
-                fields = [
-                    FieldSpec("text", self.t("JSON input"), "multiline"),
-                    FieldSpec("indent", self.t("Indent"), "integer", default=2),
-                    FieldSpec("sort_keys", self.t("Sort keys"), "boolean", default=False),
-                ]
-            else:
-                fields = fields_for_schema(self.services.describe(plugin, command)["input_schema"])
-            values = self.json_values if plugin == PLUGIN and self.json_values else None
-            self.tools.replace_form(fields, values)
-            self.form = self.tools.form
-            self.current_plugin, self.current_command = plugin, command
-            self.tools.show_command_context(
-                json_tools=plugin == PLUGIN,
-                run_title=(
-                    None
-                    if plugin == PLUGIN
-                    else self.services.describe(plugin, command)["title"]
-                ),
-            )
-            self.result_artifact = None
-            self.refresh()
+                self.json_tool.editor.focus_set()
+            elif plugin == IMAGE_PLUGIN and command == "import_images":
+                self.run_command(command)
         except Exception as error:
             self.error(str(error))
 
@@ -528,11 +932,36 @@ class Application:
         if self.task or self.background_busy:
             return
         try:
+            if self.current_plugin == IMAGE_PLUGIN:
+                if command == "import_images":
+                    arguments = {}
+                elif command == "preview":
+                    arguments = self.image_tool.preview_arguments()
+                    arguments = {
+                        key: value for key, value in arguments.items() if value is not None
+                    }
+                else:
+                    arguments = self.image_tool.arguments()
+                    arguments = {
+                        key: value for key, value in arguments.items() if value is not None
+                    }
+                self.task = self.services.commands.submit(IMAGE_PLUGIN, command, arguments)
+                self._schedule_busy_feedback(command)
+                self.refresh()
+                return
             if self.current_plugin != PLUGIN:
                 self.task = self.services.commands.submit(
                     self.current_plugin, self.current_command, self.form.get_values()
                 )
                 self._schedule_busy_feedback(self.current_command)
+                self.refresh()
+                return
+            if command == "swap":
+                self.json_tool.swap()
+                return
+            if command == "clear":
+                self.json_tool.clear()
+                self.result_artifact = None
                 self.refresh()
                 return
             if command in ("copy", "export"):
@@ -589,6 +1018,70 @@ class Application:
                 theme=self.theme,
             ).show(lambda result: None)
 
+    def open_file(self):
+        paths = filedialog.askopenfilenames(
+            parent=self.root,
+            filetypes=[
+                (self.t("Supported files"), "*.json *.jpg *.jpeg *.png *.webp"),
+                (self.t("All files"), "*"),
+            ],
+        )
+        if not paths:
+            return
+        selected = [Path(path) for path in paths]
+        suffixes = {path.suffix.casefold() for path in selected}
+        if suffixes <= {".jpg", ".jpeg", ".png", ".webp"}:
+            record = self.services.store.get(IMAGE_PLUGIN)
+            if not record or not record["enabled"]:
+                self.error(self.t("Enable Image Compressor to open image files."))
+                return
+            self.image_tool.set_files(map(str, selected))
+            self.navigate("tool", IMAGE_PLUGIN)
+            self.request_image_preview()
+        elif len(selected) == 1 and selected[0].suffix.casefold() == ".json":
+            record = self.services.store.get(PLUGIN)
+            if not record or not record["enabled"]:
+                self.error(self.t("Enable JSON Tools to open JSON files."))
+                return
+            try:
+                text = selected[0].read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as exc:
+                self.error(str(exc))
+                return
+            self.json_tool.form.set_values({"text": text})
+            self.navigate("tool", PLUGIN)
+        else:
+            self.error(self.t("No enabled tool supports this file type."))
+
+    def change_recent(self):
+        self.recent_enabled = self.settings.recent_var.get() == "1"
+        self.services.store.set_setting("host", "recent_enabled", self.recent_enabled)
+        self.refresh()
+
+    def open_data_directory(self):
+        import os
+        import subprocess
+
+        path = str(self.services.store.root)
+        try:
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            elif sys.platform == "win32":
+                os.startfile(path)  # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except OSError as exc:
+            self.error(str(exc))
+
+    def clear_logs(self):
+        logs = self.services.store.root / "logs"
+        removed = 0
+        for path in logs.glob("diagnostics.log.*"):
+            if path.is_file():
+                path.unlink()
+                removed += 1
+        self.toast.show(text=self.t("Old logs cleared") + f" ({removed})")
+
     def install_local(self):
         path = filedialog.askopenfilename(
             parent=self.root, filetypes=[("PyDesk plugin", "*.pdtplugin")]
@@ -632,12 +1125,12 @@ class Application:
         preference = self.settings.mode_preference()
         self.theme_preference = preference
         mode = preferred_theme(self.root) if preference == "system" else preference
-        self.theme.configure(mode=mode)
+        self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
         self.services.store.set_setting("host", "theme", preference)
 
     def _system_appearance_changed(self, mode):
         if self.theme_preference == "system" and self.theme.mode != mode:
-            self.theme.configure(mode=mode)
+            self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
 
     def change_language(self, event=None):
         preference = self.settings.language_preference()
@@ -648,29 +1141,19 @@ class Application:
             self.settings.configure_options(self.locale_preference, self.theme_preference)
             self.error(str(error))
             return
-        values = {
-            field.id: (
-                self.form.controls[field.id].get("1.0", "end-1c")
-                if field.kind == "multiline"
-                else self.form.variables[field.id].get()
-            )
-            for field in self.form.fields
-        }
-        for field in self.form.fields:
-            if field.kind == "boolean":
-                values[field.id] = values[field.id] == "true"
+        values = self.json_tool.form.get_values()
+        image_files = list(self.image_tool.files)
+        selected_page = self.current_page
+        selected_plugin = self.current_plugin
         self.locale_preference = preference
         self.locale = locale
         self.services.store.set_setting("host", "locale", preference)
         self.theme.translator.configure(locale=self.locale)
-        selected = (self.current_plugin, self.current_command)
-        self.current_plugin, self.current_command = PLUGIN, "format"
-        self.notebook.destroy()
+        self.palette.destroy()
+        self.app_frame.destroy()
         self.progress.destroy()
-        self._build(values if selected[0] == PLUGIN else self.json_values)
-        if selected[0] != PLUGIN:
-            self.select_command(":".join(selected))
-            self.form.set_values(values)
+        self._build(values, image_files)
+        self.navigate(selected_page, selected_plugin)
 
     def close(self):
         if self.closing:
@@ -687,7 +1170,10 @@ class Application:
             self.busy_handle = None
         for sequence, binding in self._appearance_bindings:
             self.root.unbind(sequence, binding)
+        for sequence, binding in self._key_bindings:
+            self.root.unbind(sequence, binding)
         self.subscription.close()
+        self.services.artifacts.release("image-preview")
         self.platform.close()
         self.scheduler.close()
         for handle in reversed(self.extension_handles):
@@ -699,7 +1185,8 @@ class Application:
             self.jobs.shutdown(wait=True, cancel_futures=True)
             self.services.close()
 
-        threading.Thread(target=finish, daemon=False).start()
+        self._shutdown_thread = threading.Thread(target=finish, daemon=False)
+        self._shutdown_thread.start()
 
     def run(self):
         self.root.mainloop()

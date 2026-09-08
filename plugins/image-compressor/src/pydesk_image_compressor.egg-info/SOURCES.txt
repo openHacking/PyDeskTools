@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+src/pydesk_image_compressor/__init__.py
+src/pydesk_image_compressor/py.typed
+src/pydesk_image_compressor.egg-info/PKG-INFO
+src/pydesk_image_compressor.egg-info/SOURCES.txt
+src/pydesk_image_compressor.egg-info/dependency_links.txt
+src/pydesk_image_compressor.egg-info/requires.txt
+src/pydesk_image_compressor.egg-info/top_level.txt

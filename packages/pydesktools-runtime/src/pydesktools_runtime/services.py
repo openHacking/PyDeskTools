@@ -254,6 +254,8 @@ class ServiceContainer:
             )
         if capability == "artifacts.read":
             return self.artifacts.read_copy(plugin, arguments["artifact_id"], worker.import_dir)
+        if capability == "artifacts.size":
+            return self.artifacts.path(plugin, arguments["artifact_id"]).stat().st_size
         if capability == "artifacts.release":
             self.artifacts.release(worker.session, arguments["artifact_id"])
             return None
@@ -261,6 +263,8 @@ class ServiceContainer:
             raise PluginError("permission_denied", "Capability is not declared", code=-32003)
         if self.platform_adapter is None or capability not in (
             "dialogs.open_file",
+            "dialogs.open_files",
+            "dialogs.choose_directory",
             "dialogs.save_file",
             "clipboard.write",
         ):
