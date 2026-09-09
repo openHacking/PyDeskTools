@@ -46,7 +46,7 @@ PyDeskTools 0.1.0 is an experimental pre-release. Download only from the
 
 | Platform | Artifact | Support and trust |
 | --- | --- | --- |
-| macOS 14+ on Apple silicon | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID signed and Apple notarized. Drag the app to Applications. |
+| macOS 14+ on Apple silicon | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID signed beta, not notarized. Drag the app to Applications; first launch may require **Open Anyway** in Privacy & Security. |
 | Windows 10/11 x64 | `PyDeskTools-0.1.0-windows-x64-unsigned.exe` | **Unsigned beta.** Windows SmartScreen may warn. Verify the SHA-256/provenance before running. |
 | Linux x64 | `PyDeskTools-0.1.0-linux-x86_64.AppImage` | First-release support for X11 and XWayland on distributions compatible with Ubuntu 22.04. Native Wayland is not certified. |
 

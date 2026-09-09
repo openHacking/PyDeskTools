@@ -23,7 +23,7 @@ Clean up PyInstaller-specific dynamic-library environment modifications before l
 | Target | First release delivery | Required runtime evidence |
 |---|---|---|
 | Windows 11 x64 | Signed installer containing onedir GUI and plugin runtime | Clean machine without Python; Job Object cleanup; paths with spaces/Unicode; locked-file removal |
-| macOS arm64 and x86_64 | Separate signed/notarized application builds | Tcl/Tk behavior, external runtime execution and signed wheel/native code handling under platform security policies |
+| macOS arm64 and x86_64 | Separate Developer ID-signed application builds; notarization deferred until embedded native wheels are signed | Tcl/Tk behavior, external runtime execution and signed wheel/native code handling under platform security policies |
 | Linux x86_64 | pip/source install on documented Ubuntu LTS environment | Tk system dependency, XDG paths, GUI subset under Xvfb and native desktop checks |
 
 Concrete minimum macOS version is the stricter of the chosen Python/Tk build and the validated CI target; record it in the packaging spike before advertising support. Windows arm64, Linux arm64, additional distributions and bundled Linux packages are later gates, not implied by "cross-platform".

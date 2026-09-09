@@ -8,7 +8,7 @@ separate CPython 3.13.7 runtimes pinned in `runtime-sources.json`.
 
 | Target | Native builder | Output |
 | --- | --- | --- |
-| `macos-arm64` | macOS 14 arm64, Homebrew Python 3.13 + Tk 9 | signed/notarized DMG |
+| `macos-arm64` | macOS 14 arm64, Homebrew Python 3.13 + Tk 9 | Developer ID-signed DMG (not notarized) |
 | `windows-x86_64` | Windows 2022, official Python 3.14 + Tk 9 | unsigned Inno Setup beta |
 | `linux-x86_64` | Ubuntu 22.04, source-built Python 3.14 + Tk 9 | AppImage for X11/XWayland |
 
@@ -33,19 +33,21 @@ python scripts/build_macos.py \
   --runtime-source build/plugin-runtime/macos-arm64/python
 ```
 
-A public build requires a Developer ID Application identity and an existing
-`notarytool` keychain profile:
+A public beta build requires a Developer ID Application identity:
 
 ```sh
 python scripts/build_macos.py \
   --runtime-source build/plugin-runtime/macos-arm64/python \
-  --identity 'Developer ID Application: NAME (TEAM_ID)' \
-  --notary-profile PROFILE
+  --identity 'Developer ID Application: NAME (TEAM_ID)'
 ```
 
 The builder signs nested binaries and the application, verifies the signature, creates
-and signs the DMG, submits it to Apple, staples the ticket, and validates the result.
-Signing or notarization failures are fatal; there is no fallback to ad-hoc signing.
+and signs the DMG, and records `notarized: false` in the build manifest. The release
+workflow deliberately does not submit this beta to Apple's notary service because the
+offline plugin archives currently contain native wheel binaries that are not prepared
+for notarization. Users may need to approve the app with **Open Anyway** in macOS
+Privacy & Security on first launch. Signing failures are fatal; there is no fallback
+to ad-hoc signing.
 
 ### Windows
 
@@ -93,12 +95,80 @@ The macOS job requires these repository secrets:
 - `APPLE_CERTIFICATE_P12`: base64-encoded Developer ID certificate and private key.
 - `APPLE_CERTIFICATE_PASSWORD`: export password for the P12.
 - `APPLE_SIGNING_IDENTITY`: complete Developer ID Application identity.
-- `APPLE_NOTARY_KEY_P8`: App Store Connect API private key contents.
-- `APPLE_NOTARY_KEY_ID` and `APPLE_NOTARY_ISSUER_ID`.
 
-Secrets are imported into a temporary keychain and deleted in an `always()` cleanup
-step. They are never available to pull-request CI. Release jobs use least-privilege
-permissions and actions pinned to commit SHAs.
+The certificate is imported into a temporary keychain and deleted in an `always()`
+cleanup step. It is never available to pull-request CI. Release jobs use
+least-privilege permissions and actions pinned to commit SHAs.
+
+### Prepare the macOS signing secrets
+
+Follow [Apple's Developer ID certificate guide](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)
+if the release Mac does not already have a Developer ID Application certificate.
+Creating a new Developer ID certificate normally requires the Apple Developer Program
+Account Holder. Do not create or revoke a certificate when a working identity already
+exists.
+
+On the release Mac, list usable code-signing identities:
+
+```sh
+security find-identity -v -p codesigning
+```
+
+Copy the complete Developer ID Application name, including its Team ID, into the
+`APPLE_SIGNING_IDENTITY` repository secret. For example:
+
+```text
+Developer ID Application: NAME (TEAM_ID)
+```
+
+Export the same identity and its private key with Keychain Access:
+
+1. Open **Keychain Access**, select the **login** keychain, and open **My
+   Certificates**.
+2. Find the Developer ID Application identity and expand it. A private key must appear
+   beneath the certificate. A certificate without its private key cannot sign builds
+   on CI.
+3. Select the identity, choose **File > Export Items**, and export it as Personal
+   Information Exchange (`.p12`). See
+   [Apple's Keychain export instructions](https://support.apple.com/guide/keychain-access/kyca35961/mac).
+4. Set a strong, unique password when prompted. Save that password as the
+   `APPLE_CERTIFICATE_PASSWORD` repository secret. This is the P12 export password;
+   it is not the Apple Account password, Mac login password, or an app-specific
+   password.
+
+Convert the exported P12 binary to Base64 and copy it to the clipboard:
+
+```sh
+base64 -i DeveloperIDApplication.p12 | pbcopy
+```
+
+Save the copied value as `APPLE_CERTIFICATE_P12`. This secret contains the Base64
+data, not a path to the P12 file. This follows
+[GitHub's macOS signing-certificate guidance](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications).
+
+Create all three repository secrets under **Repository Settings > Secrets and
+variables > Actions > Secrets > New repository secret**:
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CERTIFICATE_P12` | Base64 text produced from the exported P12 |
+| `APPLE_CERTIFICATE_PASSWORD` | Password chosen while exporting the P12 |
+| `APPLE_SIGNING_IDENTITY` | Complete `Developer ID Application: NAME (TEAM_ID)` name |
+
+GitHub documents the UI and `gh secret set` alternatives in
+[Using secrets in GitHub Actions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets).
+
+If P12 export is unavailable or disabled, first confirm that the private key is shown
+beneath the certificate in **My Certificates**. The private key normally exists only
+on the Mac that created the certificate signing request unless it was securely
+transferred. Obtain the original identity from that Mac or ask the Account Holder to
+create a replacement; do not revoke a working Developer ID certificate merely to fix
+a CI setup problem.
+
+Treat the P12 and its password as release credentials. Never commit the P12, its
+Base64 representation, or the password to this repository or an `.env` file. After
+the secrets are configured, keep the exported P12 only in approved encrypted storage
+or remove the temporary export from the Mac.
 
 ## Cost and retention
 

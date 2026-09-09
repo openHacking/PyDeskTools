@@ -44,7 +44,7 @@ PyDeskTools 0.1.0 是实验性 Pre-release。请只从
 
 | 平台 | 文件 | 支持与可信状态 |
 | --- | --- | --- |
-| Apple 芯片 Mac，macOS 14+ | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID 签名并通过 Apple 公证，拖入“应用程序”即可。 |
+| Apple 芯片 Mac，macOS 14+ | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID 签名的测试版，未做 Apple 公证。拖入“应用程序”后，首次启动可能需要在“隐私与安全性”中选择“仍要打开”。 |
 | Windows 10/11 x64 | `PyDeskTools-0.1.0-windows-x64-unsigned.exe` | **未签名 Beta。** SmartScreen 可能提示风险，请先核对 SHA-256 和构建来源。 |
 | Linux x64 | `PyDeskTools-0.1.0-linux-x86_64.AppImage` | 首轮支持与 Ubuntu 22.04 兼容的 X11/XWayland 桌面，尚未认证原生 Wayland。 |
 
