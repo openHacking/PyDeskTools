@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pydesk-image-compressor"
-version = "0.2.0"
+version = "0.2.2"
 description = "Offline batch image compression for PyDeskTools"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["pydesktools-sdk>=0.1,<0.2", "Pillow>=11.3,<13"]
+dependencies = ["pydesktools-sdk>=0.1.1,<0.2", "Pillow>=11.3,<13"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

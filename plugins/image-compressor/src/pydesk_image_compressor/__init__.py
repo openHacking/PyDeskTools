@@ -6,6 +6,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydesktools_sdk import CommandResult, PluginError
@@ -48,7 +49,17 @@ FILE = _input(
     },
     ("path", "name", "bytes", "width", "height", "format", "has_alpha"),
 )
-IMPORT_OUTPUT = _input({"files": {"type": "array", "items": FILE, "maxItems": 1000}}, ("files",))
+REJECTED_FILE = _input(
+    {"path": STR, "message": STR},
+    ("path", "message"),
+)
+IMPORT_OUTPUT = _input(
+    {
+        "files": {"type": "array", "items": FILE, "maxItems": 1000},
+        "rejected": {"type": "array", "items": REJECTED_FILE, "maxItems": 1000},
+    },
+    ("files", "rejected"),
+)
 PREVIEW_OUTPUT = _input(
     {
         "before_artifact_id": STR,
@@ -71,7 +82,7 @@ RESULT_ITEM = _input(
     {
         "source": STR,
         "output": {"type": ["string", "null"]},
-        "status": {"type": "string"},
+        "status": {"type": "string", "enum": ["completed", "skipped_larger", "failed", "canceled"]},
         "original_bytes": {"type": "integer"},
         "output_bytes": {"type": ["integer", "null"]},
         "message": STR,
@@ -197,7 +208,15 @@ class ImageCompressor:
                     "effects": "read",
                     "retry": "manual",
                     "timeout_ms": 300000,
-                    "input_schema": _input({}),
+                    "input_schema": _input(
+                        {
+                            "paths": {
+                                "type": "array",
+                                "items": STR,
+                                "maxItems": 1000,
+                            }
+                        }
+                    ),
                     "output_schema": IMPORT_OUTPUT,
                 },
                 {
@@ -263,25 +282,34 @@ class ImageCompressor:
 
     def invoke(self, command_id, arguments, context):
         if command_id == "import_images":
-            paths = context.host.call("dialogs.open_files", title="Add images") or []
+            paths = arguments.get("paths")
+            if paths is None:
+                paths = context.host.call("dialogs.open_files", title="Add images") or []
+            paths = list(dict.fromkeys(map(str, paths)))
             files = []
+            rejected = []
             for path in paths:
-                source, image = _open(path, context.cancellation)
                 try:
-                    files.append(
-                        {
-                            "path": str(source),
-                            "name": source.name,
-                            "bytes": source.stat().st_size,
-                            "width": image.width,
-                            "height": image.height,
-                            "format": image.format,
-                            "has_alpha": _alpha(image),
-                        }
-                    )
-                finally:
-                    image.close()
-            return CommandResult({"files": files})
+                    source, image = _open(path, context.cancellation)
+                    try:
+                        files.append(
+                            {
+                                "path": str(source.resolve()),
+                                "name": source.name,
+                                "bytes": source.stat().st_size,
+                                "width": image.width,
+                                "height": image.height,
+                                "format": image.format,
+                                "has_alpha": _alpha(image),
+                            }
+                        )
+                    finally:
+                        image.close()
+                except PluginError as error:
+                    if error.kind == "canceled":
+                        raise
+                    rejected.append({"path": str(path), "message": str(error)})
+            return CommandResult({"files": files, "rejected": rejected})
 
         if command_id == "preview":
             source, image = _open(arguments["path"], context.cancellation)
@@ -325,57 +353,54 @@ class ImageCompressor:
         shared_directory = Path(directory_value) if directory_value else None
         if shared_directory is not None and not shared_directory.is_dir():
             raise PluginError("invalid_output", "Output folder does not exist")
-        results = []
+        results: list[dict[str, Any]] = []
         paths = arguments["paths"]
         for index, path in enumerate(paths):
-            context.cancellation.raise_if_cancelled()
-            source, image = _open(path, context.cancellation)
-            directory = shared_directory or source.parent
-            processed = _prepared(image, arguments)
-            extension = FORMATS[arguments.get("format", "jpeg")][1]
-            destination = _destination(directory, source, extension)
-            fd, temporary_name = tempfile.mkstemp(prefix=".pydesk-", dir=directory)
-            os.close(fd)
-            temporary = Path(temporary_name)
+            source = Path(path).resolve()
+            item: dict[str, Any] = {"source": str(source), "output": None, "status": "canceled",
+                    "original_bytes": 0, "output_bytes": None, "message": "Canceled"}
+            image = processed = temporary = None
             try:
+                context.cancellation.raise_if_cancelled()
+                context.report_progress(index / len(paths), "Compressing",
+                                        {"items": list(results), "current": str(source)})
+                source, image = _open(path, context.cancellation)
+                item["original_bytes"] = source.stat().st_size
+                directory = shared_directory or source.parent
+                processed = _prepared(image, arguments)
+                extension = FORMATS[arguments.get("format", "jpeg")][1]
+                destination = _destination(directory, source, extension)
+                fd, temporary_name = tempfile.mkstemp(prefix=".pydesk-", dir=directory)
+                os.close(fd)
+                temporary = Path(temporary_name)
                 _save(processed, temporary, image, arguments)
                 with Image.open(temporary) as verification:
                     verification.verify()
                 context.cancellation.raise_if_cancelled()
-                output_bytes = temporary.stat().st_size
-                if output_bytes >= source.stat().st_size and not arguments.get("keep_larger"):
-                    results.append(
-                        {
-                            "source": str(source),
-                            "output": None,
-                            "status": "skipped_larger",
-                            "original_bytes": source.stat().st_size,
-                            "output_bytes": output_bytes,
-                            "message": "Skipped because the compressed file would be larger",
-                        }
-                    )
+                item["output_bytes"] = temporary.stat().st_size
+                if item["output_bytes"] >= item["original_bytes"] and not arguments.get("keep_larger"):
+                    item.update(status="skipped_larger", message="Compressed file would be larger")
                 else:
                     os.replace(temporary, destination)
-                    results.append(
-                        {
-                            "source": str(source),
-                            "output": str(destination),
-                            "status": "completed",
-                            "original_bytes": source.stat().st_size,
-                            "output_bytes": output_bytes,
-                            "message": "Compressed",
-                        }
-                    )
+                    item.update(status="completed", output=str(destination), message="Compressed")
+            except PluginError as error:
+                if error.kind != "canceled":
+                    item.update(status="failed", message=str(error))
+            except (OSError, ValueError) as error:
+                item.update(status="failed", message=str(error))
             finally:
-                temporary.unlink(missing_ok=True)
-                processed.close()
-                image.close()
-            context.report_progress(
-                (index + 1) / len(paths), f"Compressed {index + 1}/{len(paths)}"
-            )
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
+                if processed is not None:
+                    processed.close()
+                if image is not None:
+                    image.close()
+            results.append(item)
+            context.report_progress((index + 1) / len(paths), "Compression progress",
+                                    {"items": list(results), "current": None})
         return CommandResult(
             {
-                "canceled": False,
+                "canceled": context.cancellation.is_cancelled,
                 "output_directory": str(shared_directory) if shared_directory else None,
                 "items": results,
             },

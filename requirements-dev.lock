@@ -60,5 +60,6 @@ sphinxcontrib-serializinghtml==2.0.0
 twine==7.0.0
 types-simplejson==4.1.0.20260724
 typing_extensions==4.16.0
+tkinterdnd2==0.6.3
 urllib3==2.7.0
 wheel==0.48.0

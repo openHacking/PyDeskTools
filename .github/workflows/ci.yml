@@ -1,11 +1,20 @@
 name: CI
-on: [workflow_dispatch]
+
+on:
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   headless:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         python: ['3.11', '3.12', '3.13', '3.14']
     steps:
@@ -14,24 +23,46 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install pytest build twine -e packages/pydesktools-sdk -e packages/pydesktools-runtime -e plugins/json-tools
-      - run: python -m pytest tests/test_json.py
+      - run: python -m pytest tests/test_json.py tests/test_platforms.py
       - run: python -m pytest tests/test_runtime.py -k 'headless_import or protocol_rejects'
       - run: python -m build packages/pydesktools-sdk && python -m build packages/pydesktools-runtime && python -m build plugins/json-tools
       - run: python -m twine check packages/*/dist/* plugins/*/dist/*
-  desktop:
+
+  platform-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            python: '3.14.6'
+          - os: ubuntu-22.04
+            python: '3.13'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install pytest -e packages/pydesktools-sdk -e packages/pydesktools-runtime
+      - run: python -m pytest tests/test_platforms.py
+      - if: runner.os == 'Windows'
+        run: python -c "import platform, tkinter; assert platform.machine() == 'AMD64'; assert tkinter.TkVersion >= 9"
+
+  desktop-macos:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: openHacking/PyDeskUI
+          ref: ac199c4f5ab0c5320818bcd5f10494395c5cd1b8
           path: vendor/PyDeskUI
       - run: brew install python@3.13 python-tk@3.13
       - run: |
           "$(brew --prefix python@3.13)/bin/python3.13" -m venv .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-      - run: python -m pip install -e vendor/PyDeskUI -e packages/pydesktools-sdk -e packages/pydesktools-runtime -e plugins/json-tools -e '.[dev]'
-      - run: python scripts/build_bundles.py
+      - run: python -m pip install -e vendor/PyDeskUI -e packages/pydesktools-sdk -e packages/pydesktools-runtime -e plugins/json-tools -e plugins/image-compressor -e '.[dev]'
+      - run: python scripts/build_bundles.py --target macos-arm64
       - run: ruff check src packages plugins scripts tests
       - run: mypy
       - run: python -m pytest

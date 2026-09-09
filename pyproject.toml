@@ -3,24 +3,26 @@ requires = ["setuptools>=77.0.3"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "pydesktools"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Offline desktop toolbox with isolated Python plugins"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["pydeskui>=0.2.2,<0.3", "pydesktools-runtime>=0.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'"]
+dependencies = ["Pillow>=12.3,<13", "pydeskui>=0.2.3,<0.3", "pydesktools-runtime>=0.1.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'", "tkinterdnd2>=0.6.3,<0.7"]
 [project.scripts]
 pydesktools = "pydesktools.app:main"
 [project.optional-dependencies]
 dev = ["build>=1.2", "twine>=6", "pytest>=8", "ruff>=0.12", "mypy>=1.15", "types-simplejson>=4.1", "babel>=2.17", "pyinstaller>=6.15,<7"]
 [tool.setuptools]
 include-package-data = false
+[tool.setuptools.dynamic]
+version = {attr = "pydesktools._version.VERSION"}
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["pydesktools"]
 [tool.setuptools.package-data]
-pydesktools = ["py.typed", "bundles/*.pdtplugin", "bundles/*.json", "locales/**/*.mo"]
+pydesktools = ["assets/*", "py.typed", "bundles/*.pdtplugin", "bundles/*.json", "locales/**/*.mo"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100

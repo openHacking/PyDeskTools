@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "python": "3.13.7",
+  "build": "20250918",
+  "targets": {
+    "macos-arm64": {
+      "architecture": "aarch64-apple-darwin",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-aarch64-apple-darwin-install_only_stripped.tar.gz",
+      "sha256": "10f26ea5fc7c4d9c012faf372898a801f34b8fd7730c677576263224d56835fe",
+      "executable": "bin/python3.13"
+    },
+    "windows-x86_64": {
+      "architecture": "x86_64-pc-windows-msvc",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+      "sha256": "bc229e5364699a8456b6ceabde8348c75e62312ffd62631dd1e494a1755a45ed",
+      "executable": "python.exe"
+    },
+    "linux-x86_64": {
+      "architecture": "x86_64-unknown-linux-gnu",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20250918/cpython-3.13.7%2B20250918-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "sha256": "888fb7e192caafdb33e028f865b7da68dce5e924cfe58fcef96323e175a70e3e",
+      "executable": "bin/python3.13"
+    }
+  }
+}

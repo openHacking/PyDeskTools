@@ -239,3 +239,11 @@ def validate_view(view, commands):
             raise ValueError("Invalid action")
         seen.add(action["id"])
         validate(action["arguments"], commands[action["command_id"]]["input_schema"])
+
+
+def validate_progress_data(data):
+    """Bound optional structured progress independently of command output schemas."""
+    if data is not None and (
+        not isinstance(data, dict) or len(json.dumps(data, allow_nan=False).encode()) > 524288
+    ):
+        raise ValueError("Invalid progress data")

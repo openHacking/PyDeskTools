@@ -1,6 +1,8 @@
 """PyDeskTools desktop application. Importing does not create a GUI."""
 
-__version__ = "0.1.0"
+from ._version import VERSION
+
+__version__ = VERSION
 
 
 def create_application(config=None):

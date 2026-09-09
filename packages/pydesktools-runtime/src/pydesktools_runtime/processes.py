@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from pydesktools_sdk import PluginError
-from pydesktools_sdk.protocol import encode, read
+from pydesktools_sdk.protocol import encode, read, validate_progress_data
 
 
 class WorkerProcess:
@@ -207,6 +207,7 @@ class WorkerProcess:
                     ).start()
                 elif message.get("method") == "task.progress":
                     params = message["params"]
+                    validate_progress_data(params.get("data"))
                     fraction = params.get("fraction")
                     if fraction is not None and (
                         isinstance(fraction, bool)

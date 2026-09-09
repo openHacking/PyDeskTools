@@ -16,15 +16,42 @@ def start(app, destination, started):
             app.scheduler.call_later(50, ready)
             return
 
+        gui_tk_version = str(app.root.tk.call("package", "provide", "Tk"))
+
         def verify():
             report = {
                 "frozen": bool(getattr(sys, "frozen", False)),
+                "gui_tk_version": gui_tk_version,
+                "tkdnd_version": app.dnd_version,
                 "startup_seconds": round(time.monotonic() - started, 3),
             }
             try:
                 services = app.services
                 image_record = services.store.get(IMAGE_PLUGIN)
                 assert image_record and image_record["enabled"]
+                assert int(gui_tk_version.split(".")[0]) >= 9
+                if report["frozen"]:
+                    assert app.dnd_available and app.dnd_version
+                report["plugin_versions"] = {
+                    IMAGE_PLUGIN: image_record["manifest"]["version"],
+                    PLUGIN: services.store.get(PLUGIN)["manifest"]["version"],
+                }
+                from PIL import Image
+                with Image.open(Path(__file__).parent / "assets/logo.png") as logo:
+                    pixel = logo.getpixel((0, 0))
+                    assert isinstance(pixel, tuple) and len(pixel) == 4 and pixel[3] == 0
+                report["transparent_icon"] = True
+                source = services.store.root / "verification-image.png"
+                broken = services.store.root / "verification-broken.png"
+                Image.new("RGB", (96, 64), "#336699").save(source)
+                broken.write_bytes(b"not an image")
+                image_result = services.commands.submit(
+                    IMAGE_PLUGIN, "compress",
+                    {"paths": [str(broken), str(source)], "format": "webp", "keep_larger": True},
+                ).result(15)
+                assert [item["status"] for item in image_result["data"]["items"]] == ["failed", "completed"]
+                assert Path(image_result["data"]["items"][1]["output"]).is_file()
+                report["image_batch_partial_failure"] = True
                 assert {command["id"] for command in image_record["descriptor"]["commands"]} == {
                     "import_images",
                     "preview",

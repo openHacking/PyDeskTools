@@ -1,6 +1,7 @@
-include CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md CHANGELOG.md THIRD_PARTY_NOTICES.md requirements-dev.lock runtime-source.json
-recursive-include docs *.md *.json *.toml
-recursive-include scripts *.py
+include CONTRIBUTING.md CODE_OF_CONDUCT.md SECURITY.md CHANGELOG.md THIRD_PARTY_NOTICES.md README.zh-CN.md requirements-dev.lock runtime-sources.json
+recursive-include docs *.md *.json *.toml *.png
+recursive-include scripts *.py *.sh
+recursive-include packaging *
 recursive-include licenses *
 recursive-include packages *.py *.toml *.md LICENSE py.typed
 recursive-include plugins *.py *.toml *.md LICENSE py.typed

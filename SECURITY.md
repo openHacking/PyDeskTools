@@ -10,5 +10,6 @@ Local bundles require consent and are not authenticated by their own hashes.
 The application never logs JSON documents or arbitrary plugin stderr content.
 Offline default bundles inherit the application's distribution trust.
 
-0.1.0 is experimental. Online catalogs, updates/data migrations, Windows process
-containment and additional platform capabilities are not enabled in this release.
+0.1.0 is experimental. Online catalogs and updates/data migrations are not enabled.
+The Windows installer is an unsigned beta, and Linux native Wayland behavior is not
+certified. Verify release hashes and GitHub provenance before running downloaded code.

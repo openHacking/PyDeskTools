@@ -76,8 +76,8 @@ Wheel/sdist outputs live in each project's `dist` directory. The application
 copies interpreter/plugin state into its user directory without modifying itself.
 
 The standalone source, SHA-256, ABI and license inputs are recorded in
-`runtime-source.json`; build dependency versions, DMG hash and signing mode are in
-`dist/build-manifest.json`. Runtime file hashes are embedded in `runtime.json`.
+`runtime-sources.json`; build dependency versions, artifact hashes and signing mode
+are in `dist/build-manifest-<platform>.json`. Runtime file hashes are embedded in `runtime.json`.
 Third-party license texts are included in the application. The source release
 contains the build scripts and notices; no PyPI or GitHub release was published.
 

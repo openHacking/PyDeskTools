@@ -13,7 +13,7 @@ from pydesktools_runtime.plugins import inspect_bundle
 from pydesktools_sdk import CancellationToken, PluginError
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK = ROOT / "build/wheelhouse/pydesktools_sdk-0.1.0-py3-none-any.whl"
+SDK = ROOT / "build/wheelhouse/macos-arm64/pydesktools_sdk-0.1.1-py3-none-any.whl"
 
 
 def wheel(name, version, module, source, requires=()):
@@ -63,7 +63,7 @@ def create_plugin(): return Plugin()
 
 def bundle(tmp_path, identifier, dep_version):
     dist = identifier.replace(".", "-")
-    dependencies = [f"fixturedep=={dep_version}", "pydesktools-sdk==0.1.0"]
+    dependencies = [f"fixturedep=={dep_version}", "pydesktools-sdk==0.1.1"]
     filename, payload = wheel(dist, "0.1.0", "fixtureplugin", PLUGIN_SOURCE, dependencies)
     depname, dep = wheel("fixturedep", dep_version, "fixturedep", f"VERSION = {dep_version!r}\n")
     files = {
@@ -74,7 +74,7 @@ def bundle(tmp_path, identifier, dep_version):
     pins = [
         (dist, "0.1.0", payload),
         ("fixturedep", dep_version, dep),
-        ("pydesktools-sdk", "0.1.0", SDK.read_bytes()),
+        ("pydesktools-sdk", "0.1.1", SDK.read_bytes()),
     ]
     files["requirements.lock"] = "".join(
         f"{name}=={version} --hash=sha256:{hashlib.sha256(data).hexdigest()}\n"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PyDeskTools
+Comment=Offline desktop toolbox with isolated Python plugins
+Exec=PyDeskTools
+Icon=pydesktools
+Categories=Utility;Development;
+Terminal=false

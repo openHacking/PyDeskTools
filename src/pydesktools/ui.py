@@ -6,6 +6,7 @@ import tkinter as tk
 from pathlib import Path
 from typing import Any, Literal
 
+from PIL import Image, ImageTk
 from pydeskui import (
     Alert,
     Badge,
@@ -23,6 +24,7 @@ from pydeskui import (
     Label,
     NavigationItem,
     Popover,
+    ProgressView,
     ScrollArea,
     SearchEntry,
     SegmentedControl,
@@ -34,26 +36,59 @@ from pydeskui import (
     Surface,
     Switch,
     Toolbar,
+    Tooltip,
 )
 
 JSON_PLUGIN = "org.pydesk.json-tools"
 IMAGE_PLUGIN = "org.pydesk.image-compressor"
 
 
+class PaddedSurface(Surface):
+    """Apply layout padding to the frame, including on Tk's Aqua backend."""
+
+    def __init__(self, master, *, padding=0, **options):
+        super().__init__(master, padding=padding, **options)
+        self.configure(padding=padding)
+
+
+class ContentCard(Card):
+    """Application surfaces use spacing; opt into a boundary only when needed."""
+
+    def __init__(self, master, *, theme, **options):
+        options.setdefault("bordered", False)
+        super().__init__(master, theme=theme, **options)
+
+
+class HeroSearch(SearchEntry):
+    """Roomier home search, retaining PyDeskUI's focus and debounce behavior."""
+
+    def __init__(self, master, **options):
+        options.setdefault("content_padding", (14, 20))
+        super().__init__(master, **options)
+
+
+def _format_bytes(value):
+    """Format byte counts with binary thresholds and familiar UI units."""
+    size = max(0, int(value or 0))
+    if size < 1024:
+        return f"{size:,} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:,.1f} KB"
+    return f"{size / (1024 * 1024):,.1f} MB"
+
+
 def _page_header(master, *, title, subtitle, icon, theme):
     """Create the shared title treatment used by every workspace page."""
-    header = Surface(master, role="background", theme=theme)
+    header = PaddedSurface(master, role="background", theme=theme)
     Icon(
         header,
         name=icon,
         size=24,
         color=theme.tokens["primary"],
-        background=master.winfo_toplevel().cget("background"),
+
         theme=theme,
-    ).pack(
-        side="left", padx=(0, 14)
-    )
-    copy = Surface(header, role="background", theme=theme)
+    ).pack(side="left", padx=(0, 14))
+    copy = PaddedSurface(header, role="background", theme=theme)
     copy.pack(side="left", fill="x", expand=True)
     Label(copy, text=title, variant="title", surface="background", theme=theme).pack(anchor="w")
     Label(
@@ -67,7 +102,7 @@ def _page_header(master, *, title, subtitle, icon, theme):
 
 
 def _section_heading(master, *, title, subtitle=None, theme):
-    box = Surface(master, role="card", theme=theme)
+    box = PaddedSurface(master, role="card", theme=theme)
     Label(box, text=title, variant="section", theme=theme).pack(anchor="w")
     if subtitle:
         Label(box, text=subtitle, variant="muted", theme=theme).pack(anchor="w", pady=(4, 0))
@@ -75,14 +110,16 @@ def _section_heading(master, *, title, subtitle=None, theme):
 
 
 def _settings_row(master, *, title, description, icon, theme):
-    row = Surface(master, role="card", theme=theme)
+    row = PaddedSurface(master, role="card", theme=theme)
     Icon(row, name=icon, size=21, color=theme.tokens["muted_foreground"], theme=theme).pack(
         side="left", padx=(2, 16), pady=16
     )
-    copy = Surface(row, role="card", theme=theme)
+    copy = PaddedSurface(row, role="card", theme=theme)
     copy.pack(side="left", fill="x", expand=True, pady=16)
     Label(copy, text=title, theme=theme).pack(anchor="w")
-    Label(copy, text=description, variant="muted", theme=theme).pack(anchor="w", pady=(6, 0))
+    Label(copy, text=description, variant="muted", wraplength=260, theme=theme).pack(
+        anchor="w", pady=(6, 0)
+    )
     return row
 
 
@@ -124,7 +161,7 @@ class ToolSidebar(Sidebar):
     def __init__(self, master, *, translate, on_navigate, theme):
         # Match the PyDeskUI gallery rail: compact, quiet, and separated from
         # the workspace by the shell's single vertical divider.
-        super().__init__(master, theme=theme, width=188, padding=(16, 22))
+        super().__init__(master, theme=theme, width=232, padding=(12, 22))
         self.pack_propagate(False)
         self.t = translate
         self.on_navigate = on_navigate
@@ -147,9 +184,10 @@ class ToolSidebar(Sidebar):
             surface="sidebar",
             theme=theme,
         ).pack(anchor="w", pady=(0, 8), padx=6)
-        self.tools_host = Surface(self, role="sidebar", theme=theme)
+        self.tools_host = PaddedSurface(self, role="sidebar", theme=theme)
         self.tools_host.pack(fill="x")
-        Surface(self, role="sidebar", theme=theme).pack(fill="both", expand=True)
+        PaddedSurface(self, role="sidebar", theme=theme).pack(fill="both", expand=True)
+        Separator(self, theme=theme).pack(fill="x", pady=(16, 12))
         self.plugins_button = NavigationItem(
             self,
             text=self.t("Plugin center"),
@@ -166,7 +204,7 @@ class ToolSidebar(Sidebar):
             icon="settings",
         )
         self.settings_button.pack(fill="x")
-        status = Surface(self, role="sidebar", theme=theme)
+        status = PaddedSurface(self, role="sidebar", theme=theme)
         status.pack(fill="x", padx=6, pady=(22, 0))
         Icon(status, name="check", size=14, color="#36A64F", theme=theme).pack(side="left")
         Label(
@@ -209,7 +247,7 @@ class ToolSidebar(Sidebar):
         self.settings_button.configure(selected=page == "settings")
 
 
-class HomeView(Frame):
+class HomeView(PaddedSurface):
     """Search-first home page with bounded sections and useful empty states."""
 
     def __init__(
@@ -217,21 +255,21 @@ class HomeView(Frame):
     ):
         super().__init__(master, theme=theme)
         self.t = translate
-        viewport = ScrollArea(self, theme=theme, resize_debounce_ms=60)
+        viewport = ScrollArea(self, bordered=False, theme=theme, resize_debounce_ms=60)
         viewport.pack(fill="both", expand=True)
         body = viewport.content
-        body.configure(padding=(58, 42, 58, 48))
+        body.configure(padding=(42, 54, 42, 36))
 
-        self.hero = Surface(body, role="background", theme=theme)
+        self.hero = PaddedSurface(body, role="background", theme=theme)
         self.hero.pack(fill="x")
-        hero_title = Surface(self.hero, role="background", theme=theme)
+        hero_title = PaddedSurface(self.hero, role="background", theme=theme)
         hero_title.pack()
         Icon(
             hero_title,
             name="plus",
             size=28,
             color=theme.tokens["primary"],
-            background=self.winfo_toplevel().cget("background"),
+
             theme=theme,
         ).pack(side="left", padx=(0, 14))
         Label(
@@ -248,9 +286,9 @@ class HomeView(Frame):
             surface="background",
             theme=theme,
         ).pack(anchor="center", pady=(10, 30))
-        self.search_card = Surface(self.hero, role="background", theme=theme)
-        self.search_card.pack(fill="x", padx=84)
-        self.search = SearchEntry(
+        self.search_card = PaddedSurface(self.hero, role="background", theme=theme)
+        self.search_card.pack(fill="x", padx=24)
+        self.search = HeroSearch(
             self.search_card,
             on_change=on_search,
             placeholder=self.t("Search tools or commands, e.g. format JSON, compress images…"),
@@ -261,47 +299,34 @@ class HomeView(Frame):
         self.results = ItemList(self.search_card, theme=theme, on_select=on_select)
         self.results.tree.configure(height=4)
 
-        shortcuts = Surface(self.hero, role="background", theme=theme)
+        shortcuts = PaddedSurface(self.hero, role="background", theme=theme)
         shortcuts.pack(pady=(18, 0))
-        for text, icon in (
-            ("Search tools", "search"),
-            ("Find commands", "check"),
-            ("Open file", "upload"),
+        for text, icon, command in (
+            ("Search tools", "search", self.search.focus_set),
+            ("Find commands", "check", self.search.focus_set),
+            ("Open file", "upload", on_open_file),
         ):
-            item = Surface(shortcuts, role="background", theme=theme)
-            item.pack(side="left", padx=26)
-            Icon(
-                item,
-                name=icon,
-                size=18,
-                color=theme.tokens["muted_foreground"],
-                background=self.winfo_toplevel().cget("background"),
-                theme=theme,
-            ).pack(
-                side="left", padx=(0, 9)
-            )
-            Label(
-                item,
+            Button(
+                shortcuts,
                 text=self.t(text),
-                variant="muted",
-                surface="background",
+                icon=icon,
+                command=command,
+                variant="ghost",
                 theme=theme,
-            ).pack(side="left")
+            ).pack(side="left", padx=18)
 
-        recent_card = Surface(body, role="background", padding=4, theme=theme)
+        recent_card = PaddedSurface(body, role="background", padding=4, theme=theme)
         recent_card.pack(fill="x", pady=(38, 0))
-        recent_header = Surface(recent_card, role="card", theme=theme)
+        recent_header = PaddedSurface(recent_card, role="background", theme=theme)
         recent_header.pack(fill="x")
         Icon(
             recent_header,
             name="download",
             size=19,
             color=theme.tokens["muted_foreground"],
-            background=self.winfo_toplevel().cget("background"),
+
             theme=theme,
-        ).pack(
-            side="left", padx=(0, 10)
-        )
+        ).pack(side="left", padx=(0, 10))
         Label(recent_header, text=self.t("Continue working"), variant="section", theme=theme).pack(
             side="left"
         )
@@ -314,31 +339,27 @@ class HomeView(Frame):
             theme=theme,
         )
 
-        guide = Surface(body, role="background", theme=theme, padding=(4, 12))
+        guide = ContentCard(body, theme=theme, padding=24)
         guide.pack(fill="x", pady=(22, 0))
-        guide_title = Surface(guide, role="background", theme=theme)
+        guide_title = PaddedSurface(guide, role="card", theme=theme)
         guide_title.pack(fill="x")
         Icon(
             guide_title,
             name="plus",
             size=19,
             color=theme.tokens["primary"],
-            background=self.winfo_toplevel().cget("background"),
+
             theme=theme,
-        ).pack(
-            side="left", padx=(0, 10)
-        )
+        ).pack(side="left", padx=(0, 10))
         Label(
             guide_title,
             text=self.t("Two ways to get started"),
             variant="section",
-            surface="background",
+            surface="card",
             theme=theme,
-        ).pack(
-            side="left"
-        )
-        columns = Surface(guide, role="background", theme=theme)
-        columns.pack(fill="x", pady=(20, 18))
+        ).pack(side="left")
+        columns = PaddedSurface(guide, role="card", theme=theme)
+        columns.pack(fill="x", pady=(26, 24))
         columns.columnconfigure((0, 2), weight=1, uniform="guide")
         for column, (title, description, icon) in enumerate(
             (
@@ -355,32 +376,28 @@ class HomeView(Frame):
             )
         ):
             target = column * 2
-            card = Surface(columns, role="background", padding=(4, 10), theme=theme)
+            card = PaddedSurface(columns, role="card", padding=(4, 10), theme=theme)
             card.grid(row=0, column=target, sticky="nsew")
             Icon(
                 card,
                 name=icon,
                 size=25,
                 color=theme.tokens["primary"],
-                background=self.winfo_toplevel().cget("background"),
+
                 theme=theme,
-            ).pack(
-                side="left", padx=(0, 16)
-            )
-            copy = Surface(card, role="background", theme=theme)
+            ).pack(side="left", padx=(0, 16))
+            copy = PaddedSurface(card, role="card", theme=theme)
             copy.pack(side="left", fill="x", expand=True)
-            Label(copy, text=title, variant="section", surface="background", theme=theme).pack(
-                anchor="w"
-            )
+            Label(copy, text=title, variant="section", surface="card", theme=theme).pack(anchor="w")
             Label(
                 copy,
                 text=description,
                 variant="muted",
-                surface="background",
+                surface="card",
                 wraplength=330,
                 theme=theme,
             ).pack(anchor="w", pady=(6, 0))
-        actions = Surface(guide, role="background", theme=theme)
+        actions = PaddedSurface(guide, role="card", theme=theme)
         actions.pack(fill="x")
         Button(
             actions,
@@ -450,12 +467,14 @@ class _JSONOutput(CodeEditor):
         self._update_chrome()
 
 
-class JSONToolView(Frame):
+class JSONToolView(PaddedSurface):
     """Aligned input/output workbench with one functional center divider."""
 
-    def __init__(self, master, *, translate, on_command, theme):
+    def __init__(self, master, *, translate, on_command, on_reveal_export, theme):
         super().__init__(master, theme=theme)
         self.t = translate
+        self.on_reveal_export = on_reveal_export
+        self.export_path: Path | None = None
         self.indent_var = tk.StringVar(master=self, value="2")
         self.sort_var = tk.StringVar(master=self, value="0")
         title_surface = _page_header(
@@ -474,7 +493,6 @@ class JSONToolView(Frame):
             ("Format", "format", "primary", "check"),
             ("Minify", "minify", "secondary", "minus"),
             ("Import", "import", "default", "upload"),
-            ("Swap", "swap", "default", "chevron-right"),
             ("Clear", "clear", "default", "trash"),
         ):
             button = Button(
@@ -508,16 +526,21 @@ class JSONToolView(Frame):
             theme=theme,
         )
         self.settings_button.pack(side="right", padx=(6, 0))
-        self.options = Popover(self.settings_button, theme=theme)
+        self.options = Popover(
+            self.settings_button,
+            close_on_return=True,
+            theme=theme,
+        )
         Label(self.options.content, text=self.t("Indent"), theme=theme).pack(anchor="w")
-        Spinbox(
+        self.indent_control = Spinbox(
             self.options.content,
             textvariable=self.indent_var,
             from_=0,
             to=8,
             width=8,
             theme=theme,
-        ).pack(anchor="w", pady=(4, 10))
+        )
+        self.indent_control.pack(anchor="w", pady=(4, 10))
         Switch(
             self.options.content,
             text=self.t("Sort keys"),
@@ -526,37 +549,66 @@ class JSONToolView(Frame):
             offvalue="0",
             theme=theme,
         ).pack(anchor="w")
+        Button(
+            self.options.content,
+            text=self.t("Done"),
+            command=self.options.hide,
+            variant="primary",
+            size="small",
+            theme=theme,
+        ).pack(anchor="e", pady=(14, 0))
         self.split = SplitPane(self, orient="horizontal", theme=theme)
         self.split.pack(fill="both", expand=True, padx=28, pady=(0, 24))
-        input_card = Surface(self.split, role="card", theme=theme)
-        input_header = Surface(input_card, role="card", padding=(16, 14), theme=theme)
+        input_card = ContentCard(self.split, padding=1, theme=theme)
+        input_header = PaddedSurface(input_card, role="card", padding=(16, 14), theme=theme)
         input_header.pack(fill="x")
         Label(input_header, text=self.t("Input (raw JSON)"), variant="section", theme=theme).pack(
             side="left"
         )
         self.input_count = Badge(input_header, text="0", variant="secondary", theme=theme)
         self.input_count.pack(side="right")
-        editor_host = Surface(input_card, role="card", padding=(16, 12), theme=theme)
+        editor_host = PaddedSurface(input_card, role="card", padding=(16, 12), theme=theme)
         editor_host.pack(fill="both", expand=True)
-        self.editor = CodeEditor(editor_host, theme=theme)
+        self.editor = CodeEditor(editor_host, bordered=False, theme=theme)
         self.editor.pack(fill="both", expand=True)
         self.editor.insert("1.0", '{"hello": "世界"}')
         self.editor.text.bind("<<Modified>>", self._update_input_count, add="+")
-        output_card = Surface(self.split, role="card", theme=theme)
-        output_header = Surface(output_card, role="card", padding=(16, 14), theme=theme)
+        output_card = ContentCard(self.split, padding=1, theme=theme)
+        output_header = PaddedSurface(output_card, role="card", padding=(16, 14), theme=theme)
         output_header.pack(fill="x")
-        Label(output_header, text=self.t("Output (formatted result)"), variant="section", theme=theme).pack(
-            side="left"
-        )
+        Label(
+            output_header, text=self.t("Output (formatted result)"), variant="section", theme=theme
+        ).pack(side="left")
         self.output_badge = Badge(
             output_header, text=self.t("Waiting"), variant="secondary", theme=theme
         )
         self.output_badge.pack(side="right")
-        detail_host = Surface(output_card, role="card", padding=(16, 12), theme=theme)
+        detail_host = PaddedSurface(output_card, role="card", padding=(16, 12), theme=theme)
         detail_host.pack(fill="both", expand=True)
-        self.detail = _JSONOutput(detail_host, readonly=True, theme=theme)
+        self.detail = _JSONOutput(detail_host, readonly=True, bordered=False, theme=theme)
         self.detail.pack(fill="both", expand=True)
-        self.detail.set_content(self.t("Output (formatted result)"), self.t("No result yet"), "code")
+        self.buttons["swap"] = Button(
+            self.detail.status_bar, text=self.t("Use result as input"), variant="ghost",
+            size="small", icon="chevron-left", command=lambda: on_command("swap"), theme=theme)
+        self.buttons["swap"].pack(side="right")
+        self.reveal_export = Button(
+            self.detail.status_bar,
+            text=self.t("Show in folder"),
+            variant="ghost",
+            size="small",
+            command=self._reveal_export,
+            theme=theme,
+        )
+        self.export_status = Label(
+            self.detail.status_bar,
+            text="",
+            variant="muted",
+            theme=theme,
+        )
+        self.export_tooltip = Tooltip(self.export_status, text="", theme=theme)
+        self.detail.set_content(
+            self.t("Output (formatted result)"), self.t("No result yet"), "code"
+        )
         self.split.add(input_card, weight=1)
         self.split.add(output_card, weight=1)
         self.form = _JSONValues(self.editor, self.indent_var, self.sort_var)
@@ -575,36 +627,79 @@ class JSONToolView(Frame):
         return list(self.buttons.values())
 
     def _show_options(self):
-        self.options.show()
+        self.options.toggle(focus=self.indent_control)
 
     def result_text(self):
         return self.detail.text.get("1.0", "end-1c")
 
-    def swap(self):
-        value = self.result_text()
-        if value:
-            self.editor.delete("1.0", "end")
-            self.editor.insert("1.0", value)
+    def show_export_success(self, path):
+        self.export_path = Path(path)
+        self.export_status.configure(text=f"{self.t('Exported')}: {self.export_path.name}")
+        self.export_tooltip.set_text(str(self.export_path))
+        self.reveal_export.pack(side="right", padx=(8, 0))
+        self.export_status.pack(side="right")
+
+    def clear_export_feedback(self):
+        self.export_path = None
+        self.export_status.pack_forget()
+        self.reveal_export.pack_forget()
+
+    def _reveal_export(self):
+        if self.export_path is not None:
+            self.on_reveal_export(self.export_path)
 
     def clear(self):
+        self.clear_export_feedback()
         self.editor.delete("1.0", "end")
-        self.detail.set_content(self.t("Output (formatted result)"), self.t("No result yet"), "code")
+        self.detail.set_content(
+            self.t("Output (formatted result)"), self.t("No result yet"), "code"
+        )
         self.output_badge.configure(text=self.t("Waiting"))
 
 
-class ImageCompressorView(Frame):
+class _ResultLabel(Label):
+    def set_content(self, title, body, _format=None):
+        self.configure(text=title + ("\n" + body if body else ""))
+
+
+class ImageCompressorView(PaddedSurface):
     """A continuous batch workflow: add, inspect, tune, and compress."""
 
-    def __init__(self, master, *, translate, on_command, on_preview, theme):
+    def __init__(
+        self,
+        master,
+        *,
+        translate,
+        on_command,
+        on_preview,
+        on_discard,
+        on_state_change,
+        on_drop,
+        dnd_available,
+        theme,
+    ):
         super().__init__(master, theme=theme)
         self.t = translate
         self.on_preview = on_preview
+        self.on_discard = on_discard
+        self.on_state_change = on_state_change
+        self.on_drop = on_drop
+        self.dnd_available = dnd_available
         self.files: list[str] = []
+        self.file_results: dict[str, dict] = {}
+        self.output_directories: list[Path] = []
+        self._batch_paths: list[str] = []
+        self._needs_recompress = False
+        self._busy = False
         self.selected_path: str | None = None
-        self._photos = []
+        self._photos: list[Any] = []
+        self._preview_originals: dict[str, Image.Image] = {}
         self._preview_paths: tuple[Path, Path] | None = None
         self._preview_resize_job = None
+        self._preview_size = None
+        self._render_signature = None
         self._settings_job = None
+        self._status_icons: dict[str, Any] = {}
         self.preview_mode = tk.StringVar(master=self, value="after")
         self.variables = {
             "format": tk.StringVar(master=self, value="JPEG"),
@@ -624,6 +719,7 @@ class ImageCompressorView(Frame):
         )
         heading.pack(fill="x", padx=28, pady=(24, 18))
         toolbar = Toolbar(self, theme=theme, padding=(0, 16))
+        self.toolbar = toolbar
         toolbar.pack(fill="x", padx=28)
         self.buttons = {}
         for title, command, variant, icon in (
@@ -638,7 +734,7 @@ class ImageCompressorView(Frame):
                 variant=variant,
                 icon=icon,
             )
-            button.pack(side="right", padx=(10, 0))
+            button.pack(side="left" if command == "import_images" else "right", padx=(0, 10))
             self.buttons[command] = button
         self.queue_count = Label(
             toolbar,
@@ -647,26 +743,90 @@ class ImageCompressorView(Frame):
             surface="background",
             theme=theme,
         )
-        self.queue_count.pack(side="left")
+        self.queue_count.pack(side="left", padx=12)
+        self.clear_button = Button(
+            toolbar,
+            text=self.t("Clear list"),
+            command=self.clear_batch,
+            variant="ghost",
+            icon="trash",
+            theme=theme,
+        )
+        self.clear_button.pack(side="left", padx=(0, 10))
 
-        body = Surface(self, role="background", theme=theme)
+        body = PaddedSurface(self, role="background", theme=theme)
         body.pack(fill="both", expand=True, padx=28, pady=(0, 24))
-        body.columnconfigure(0, minsize=210)
+        self.body = body
+        body.columnconfigure(0, minsize=theme.px(230))
         body.columnconfigure(2, weight=1)
-        body.columnconfigure(4, minsize=250)
+        body.columnconfigure(4, minsize=theme.px(250))
         body.rowconfigure(0, weight=1)
 
-        self.queue_card = Surface(body, role="background", padding=(0, 4, 18, 0), theme=theme)
-        self.queue_card.grid(row=0, column=0, sticky="nsew")
+        self.empty_card = ContentCard(body, bordered=True, padding=28, theme=theme)
+        empty_content = PaddedSurface(self.empty_card, role="card", theme=theme)
+        empty_content.pack(fill="both", expand=True)
+        empty_center = PaddedSurface(empty_content, role="card", theme=theme)
+        empty_center.place(relx=0.5, rely=0.46, anchor="center")
+        Icon(
+            empty_center,
+            name="image",
+            size=48,
+            color=theme.tokens["primary"],
+            theme=theme,
+        ).pack(pady=(0, 18))
+        self.drop_title = Label(
+            empty_center,
+            text=self.t("Drag images here"),
+            variant="section",
+            surface="card",
+            theme=theme,
+        )
+        self.drop_title.pack()
+        Label(
+            empty_center,
+            text=self.t("JPEG, PNG or WebP · up to 1000 images"),
+            variant="muted",
+            surface="card",
+            theme=theme,
+        ).pack(pady=(8, 18))
+        self.empty_add_button = Button(
+            empty_center,
+            text=self.t("Choose images"),
+            command=lambda: on_command("import_images"),
+            variant="primary",
+            icon="plus",
+            theme=theme,
+        )
+        self.empty_add_button.pack()
+        Label(
+            empty_center,
+            text=self.t("Images are processed locally and never uploaded."),
+            variant="muted",
+            surface="card",
+            theme=theme,
+        ).pack(pady=(18, 0))
+
+        self.queue_card = ContentCard(
+            body, width=theme.px(230), bordered=True, padding=10, theme=theme
+        )
+        self.queue_card.grid_propagate(False)
+        self.queue_card.pack_propagate(False)
+        self.queue_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         Label(
             self.queue_card,
             text=self.t("Images"),
             variant="section",
-            surface="background",
+            surface="card",
             theme=theme,
         ).pack(anchor="w", pady=(0, 12))
         self.queue = ItemList(self.queue_card, theme=theme, on_select=self._select_file)
         self.queue.pack(fill="both", expand=True)
+        self.queue.tree.column("#0", width=theme.px(200), minwidth=80, stretch=True)
+        queue_style = "ImageQueue." + theme.name("Treeview")
+        theme.style.configure(queue_style, rowheight=theme.px(54))
+        self.queue.tree.configure(style=queue_style)
+        self.queue_tooltip = Tooltip(self.queue.tree, text="", theme=theme)
+        self.queue.tree.bind("<Motion>", self._queue_hover, add="+")
         self.remove_button = Button(
             self.queue_card,
             text=self.t("Remove selected"),
@@ -676,15 +836,15 @@ class ImageCompressorView(Frame):
             theme=theme,
         )
         self.remove_button.pack(anchor="w", pady=(10, 0))
-        self.preview_card = Surface(body, role="background", padding=(22, 4), theme=theme)
+        self.preview_card = ContentCard(body, bordered=True, padding=18, theme=theme)
         self.preview_card.grid(row=0, column=2, sticky="nsew")
-        preview_header = Surface(self.preview_card, role="background", theme=theme)
+        preview_header = PaddedSurface(self.preview_card, role="card", theme=theme)
         preview_header.pack(fill="x")
         Label(
             preview_header,
             text=self.t("Preview"),
             variant="section",
-            surface="background",
+            surface="card",
             theme=theme,
         ).pack(anchor="w")
         self.preview_toggle = SegmentedControl(
@@ -702,7 +862,8 @@ class ImageCompressorView(Frame):
         self.preview_image = Label(
             self.preview_card,
             text=self.t("A compressed preview will appear automatically"),
-            surface="background",
+            surface="card",
+            anchor="center",
             theme=theme,
         )
         self.preview_image.pack(fill="both", expand=True, pady=(18, 10))
@@ -711,15 +872,21 @@ class ImageCompressorView(Frame):
             self.preview_card,
             text=self.t("Add one or more JPEG, PNG, or WebP images to begin."),
             variant="muted",
-            surface="background",
+            surface="card",
             theme=theme,
         )
         self.preview_summary.pack(anchor="w")
 
-        self.options_card = Surface(
-            body, role="background", padding=(18, 4, 0, 0), theme=theme
+        options_host = ContentCard(
+            body, width=theme.px(250), bordered=True, padding=0, theme=theme
         )
-        self.options_card.grid(row=0, column=4, sticky="nsew")
+        options_host.grid(row=0, column=4, sticky="nsew", padx=(12, 0))
+        options_host.pack_propagate(False)
+        options_scroll = ScrollArea(options_host, bordered=False, theme=theme)
+        options_scroll.pack(fill="both", expand=True)
+        self.options_card = PaddedSurface(options_scroll.content, padding=12, theme=theme)
+        self.options_card.pack(fill="both", expand=True)
+        self.option_controls: list[Any] = []
         Label(
             self.options_card,
             text=self.t("Compression settings"),
@@ -736,9 +903,11 @@ class ImageCompressorView(Frame):
         Label(self.options_card, text=self.t("JPEG background color"), theme=theme).pack(
             anchor="w", pady=(10, 4)
         )
-        Entry(self.options_card, textvariable=self.variables["background"], theme=theme).pack(
-            fill="x"
+        background_entry = Entry(
+            self.options_card, textvariable=self.variables["background"], theme=theme
         )
+        background_entry.pack(fill="x")
+        self.option_controls.append(background_entry)
         Label(
             self.options_card,
             text=self.t("Compressed files are saved beside the originals."),
@@ -747,44 +916,203 @@ class ImageCompressorView(Frame):
             wraplength=230,
             theme=theme,
         ).pack(anchor="w", pady=(18, 0))
-        self.result = DetailView(self.options_card, theme=theme)
-        self.result.text.configure(width=24, height=4)
-        self.result.pack(fill="x", pady=(18, 0))
-        self.result.set_content(self.t("Results"), self.t("No result yet"))
+        self.feedback = PaddedSurface(
+            self,
+            height=theme.px(56),
+            padding=(28, 8),
+            theme=theme,
+        )
+        self.feedback.pack_propagate(False)
+        self.batch_progress = ProgressView(self.feedback, theme=theme)
+        self.result = _ResultLabel(
+            self.feedback,
+            text=self.t("Compressed files are saved beside the originals."),
+            surface="background",
+            theme=theme,
+        )
+        self.result.pack(side="left", fill="x", expand=True)
+        self.open_output = Button(
+            self.feedback,
+            text=self.t("Open output folder"),
+            command=self._open_output,
+            variant="ghost",
+            theme=theme,
+        )
+        self.output_tooltip = Tooltip(self.open_output, text="", theme=theme)
+        self.next_batch = Button(
+            self.feedback,
+            text=self.t("Clear and start next batch"),
+            command=self.clear_batch,
+            variant="secondary",
+            theme=theme,
+        )
+        self._build_status_icons()
         for variable in self.variables.values():
             variable.trace_add("write", self._settings_changed)
+        self._setup_drop_targets()
+        self._sync_layout()
+
+    def _refresh_theme(self):
+        super()._refresh_theme()
+        if hasattr(self, "queue"):
+            self._build_status_icons()
+            self._update_queue()
+
+    def _build_status_icons(self):
+        success = "#3FB950" if self.theme.mode == "dark" else "#238636"
+        specifications = {
+            "pending": ("minus", self.theme.tokens["muted_foreground"]),
+            "running": ("image", self.theme.tokens["primary"]),
+            "completed": ("check", success),
+            "skipped_larger": ("minus", self.theme.tokens["muted_foreground"]),
+            "failed": ("x", self.theme.tokens["destructive"]),
+            "canceled": ("x", self.theme.tokens["muted_foreground"]),
+        }
+        icons = {}
+        for status, (name, color) in specifications.items():
+            icons[status] = self.theme.icon_image(name, size=16, color=color)
+        self._status_icons = icons
+
+    def _queue_hover(self, event):
+        path = self.queue.tree.identify_row(event.y)
+        result = self.file_results.get(path, {})
+        self.queue_tooltip.set_text(path + ("\n" + result.get("output", "") if result.get("output") else "")
+                                    + ("\n" + result.get("message", "") if result.get("message") else ""))
+
+    def _update_queue(self):
+        labels = {"pending": "Pending", "running": "Compressing", "completed": "Saved",
+                  "skipped_larger": "Skipped: no reduction", "failed": "Failed", "canceled": "Canceled"}
+        self.queue.set_items([Item(path, Path(path).name) for path in self.files])
+        for path in self.files:
+            name = Path(path).name
+            title = name[:24] + ("…" if len(name) > 24 else "")
+            result = self.file_results.get(path, {})
+            status_key = result.get("status", "pending")
+            status = self.t(labels.get(status_key, "Pending"))
+            if status_key == "completed" and result.get("original_bytes"):
+                reduction = 100 * (1 - result["output_bytes"] / result["original_bytes"])
+                status += f" · +{-reduction:.0f}%" if reduction < 0 else f" · −{reduction:.0f}%"
+            self.queue.tree.item(
+                path,
+                text=title + "\n" + status,
+                image=self._status_icons.get(status_key, ""),
+            )
+        if self.files:
+            self.queue_count.configure(
+                text=f"{len(self.pending_paths())} {self.t('Pending')} · "
+                f"{len(self.files)} {self.t('images selected')}"
+            )
+
+    def pending_paths(self):
+        terminal = {"completed", "skipped_larger"}
+        return [
+            path
+            for path in self.files
+            if self.file_results.get(path, {}).get("status") not in terminal
+        ]
+
+    def begin_batch(self, paths, on_cancel):
+        self._batch_paths = list(paths)
+        for path in self._batch_paths:
+            self.file_results.pop(path, None)
+        self._update_queue()
+        self.open_output.pack_forget()
+        self.next_batch.pack_forget()
+        self.result.pack_forget()
+        self.batch_progress.cancel.configure(command=on_cancel)
+        self.batch_progress.cancel.pack(anchor="e")
+        self.batch_progress.pack(fill="x", expand=True)
+        self.batch_progress.update_progress(0, self.t("Compressing"))
+
+    def batch_update(self, data, fraction=None):
+        for item in data.get("items", []):
+            if item.get("source") in self.files:
+                self.file_results[item["source"]] = item
+        current = data.get("current")
+        if current in self.files:
+            self.file_results[current] = {"status": "running"}
+        self._update_queue()
+        self.batch_progress.update_progress(
+            fraction, f"{len(data.get('items', []))}/{len(self._batch_paths)}"
+        )
+
+    def finish_batch(self, data):
+        self.batch_update(data, 1)
+        self._batch_paths = []
+        self._needs_recompress = False
+        self.batch_progress.pack_forget()
+        results = list(self.file_results.values())
+        saved = [r for r in results if r.get("status") == "completed"]
+        skipped = sum(r.get("status") == "skipped_larger" for r in results)
+        failed = sum(r.get("status") == "failed" for r in results)
+        canceled = sum(r.get("status") == "canceled" for r in results)
+        saved_bytes = sum(r["original_bytes"] - r["output_bytes"] for r in saved)
+        self.output_directories = list(dict.fromkeys(Path(r["output"]).parent for r in saved))
+        summary = f"{self.t('Saved')} {len(saved)} · {self.t('Skipped')} {skipped} · {self.t('Failed')} {failed}"
+        if canceled:
+            summary += f" · {self.t('Canceled')} {canceled}"
+        space_label = self.t("Space saved" if saved_bytes >= 0 else "Space added")
+        summary += f" · {space_label}: {_format_bytes(abs(saved_bytes))}"
+        if self.output_directories:
+            directories = "; ".join(map(str, self.output_directories))
+            self.output_tooltip.set_text(self.t("Saved to") + ": " + directories)
+            self.open_output.pack(side="right")
+        self.next_batch.pack(side="right", padx=(8, 0))
+        self.result.configure(text=summary, wraplength=max(300, self.winfo_width() - 60))
+        self.result.pack(side="left", fill="x", expand=True)
+        self.on_state_change()
+
+    def _open_output(self):
+        import webbrowser
+        selected = self.file_results.get(self.selected_path or "", {}).get("output")
+        directories = [Path(selected).parent] if selected else self.output_directories
+        for directory in directories:
+            webbrowser.open(directory.as_uri())
 
     def _select(self, master, title, key, values):
         Label(master, text=self.t(title), theme=self.theme).pack(anchor="w", pady=(10, 4))
-        Select(
+        control = Select(
             master,
             textvariable=self.variables[key],
             values=values,
             state="readonly",
             theme=self.theme,
-        ).pack(fill="x")
+        )
+        control.pack(fill="x")
+        self.option_controls.append(control)
 
     def _spin(self, master, title, key, start, end):
         Label(master, text=self.t(title), theme=self.theme).pack(anchor="w", pady=(10, 4))
-        Spinbox(
+        control = Spinbox(
             master,
             textvariable=self.variables[key],
             from_=start,
             to=end,
             theme=self.theme,
-        ).pack(fill="x")
+        )
+        control.pack(fill="x")
+        self.option_controls.append(control)
 
     def _switch(self, master, title, key):
-        Switch(
+        control = Switch(
             master,
             text=self.t(title),
             variable=self.variables[key],
             onvalue="1",
             offvalue="0",
             theme=self.theme,
-        ).pack(anchor="w", pady=(10, 0))
+        )
+        control.pack(anchor="w", pady=(10, 0))
+        self.option_controls.append(control)
 
     def _settings_changed(self, *_args):
+        if self.file_results:
+            self._needs_recompress = True
+            self.file_results = {}
+            self.output_directories = []
+            self._update_queue()
+            self._show_ready_feedback()
+            self.on_state_change()
         if self._settings_job is not None:
             self.after_cancel(self._settings_job)
         self._settings_job = self.after(350, self._request_preview)
@@ -798,17 +1126,50 @@ class ImageCompressorView(Frame):
         if not path or path == self.selected_path:
             return
         self.selected_path = path
+        self._clear_preview_images()
+        self._preview_paths = None
+        self._photos = []
+        self.preview_image.configure(image="", text=self.t("Loading preview…"))
         self.on_preview()
 
     def _remove_selected(self):
         if not self.selected_path:
             return
+        removed = [self.selected_path]
         remaining = [path for path in self.files if path != self.selected_path]
         self.set_files(remaining)
+        self.on_discard(removed)
+        self.on_state_change()
+
+    def clear_batch(self):
+        if self._busy or not self.files:
+            return
+        removed = list(self.files)
+        self.set_files([])
+        self.on_discard(removed)
+        self.on_state_change()
+
+    def _clear_preview_images(self):
+        self._render_signature = None
+        for original in self._preview_originals.values():
+            original.close()
+        self._preview_originals.clear()
+
+    def destroy(self):
+        for job in (self._preview_resize_job, self._settings_job):
+            if job is not None:
+                self.after_cancel(job)
+        self._clear_preview_images()
+        self._photos.clear()
+        super().destroy()
 
     def _preview_resized(self, _event=None):
         if not self._preview_paths:
             return
+        size = (self.preview_image.winfo_width(), self.preview_image.winfo_height())
+        if size == self._preview_size:
+            return
+        self._preview_size = size
         if self._preview_resize_job is not None:
             self.after_cancel(self._preview_resize_job)
         self._preview_resize_job = self.after(80, self._render_preview)
@@ -820,16 +1181,121 @@ class ImageCompressorView(Frame):
         width = max(120, self.preview_image.winfo_width() - 24)
         height = max(120, self.preview_image.winfo_height() - 12)
         path = self._preview_paths[0 if self.preview_mode.get() == "before" else 1]
+        signature = (str(path), width, height)
+        if signature == self._render_signature:
+            return
         try:
-            original = tk.PhotoImage(master=self, file=str(path))
-            factor = max(1, (original.width() + width - 1) // width)
-            factor = max(factor, (original.height() + height - 1) // height)
-            photo = original.subsample(factor, factor) if factor > 1 else original
+            original = self._preview_originals.get(str(path))
+            if original is None:
+                with Image.open(path) as source:
+                    original = source.copy()
+                self._preview_originals[str(path)] = original
+            resized = original.copy()
+            resized.thumbnail((width, height), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(resized, master=self)
+            resized.close()
             self.preview_image.configure(image=photo, text="")
             self._photos = [photo]
-        except tk.TclError:
+            self._render_signature = signature
+        except (OSError, tk.TclError):
             self.preview_image.configure(text=Path(path).name, image="")
             self._photos = []
+
+    def _setup_drop_targets(self):
+        if not self.dnd_available:
+            return
+        def descendants(widget):
+            yield widget
+            for child in widget.winfo_children():
+                yield from descendants(child)
+
+        # TkDND resolves the widget directly beneath the pointer. Register the
+        # visible children too, otherwise labels or the Treeview can mask the
+        # card-level target during a real Finder drag.
+        targets = [*descendants(self.empty_card), *descendants(self.queue_card)]
+        for target in targets:
+            register = getattr(target, "drop_target_register")
+            bind = getattr(target, "dnd_bind")
+            register("DND_Files")
+            bind("<<DropEnter>>", self._drop_enter)
+            bind("<<DropLeave>>", self._drop_leave)
+            bind("<<Drop>>", self._drop_files)
+
+    def _drop_enter(self, _event):
+        if self._busy:
+            return "refuse_drop"
+        target = self.queue_card if self.files else self.empty_card
+        target.configure(borderwidth=self.theme.px(2))
+        if not self.files:
+            self.drop_title.configure(text=self.t("Release to add images"))
+        return "copy"
+
+    def _drop_leave(self, _event):
+        self.empty_card.configure(borderwidth=self.theme.px(1))
+        self.queue_card.configure(borderwidth=self.theme.px(1))
+        self.drop_title.configure(text=self.t("Drag images here"))
+        return "copy"
+
+    def _drop_files(self, event):
+        self._drop_leave(event)
+        if self._busy:
+            return "refuse_drop"
+        paths = list(self.tk.splitlist(event.data))
+        return "copy" if self.on_drop(paths) else "refuse_drop"
+
+    def _show_ready_feedback(self):
+        if not self.files:
+            return
+        self.batch_progress.pack_forget()
+        self.open_output.pack_forget()
+        self.next_batch.pack_forget()
+        count = len(self.pending_paths())
+        self.result.configure(
+            text=f"{count} {self.t('images ready to compress')}",
+            wraplength=max(300, self.winfo_width() - 60),
+        )
+        if not self.result.winfo_manager():
+            self.result.pack(side="left", fill="x", expand=True)
+
+    def _sync_layout(self):
+        if self.files:
+            self.empty_card.grid_remove()
+            self.queue_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+            self.preview_card.grid(row=0, column=2, sticky="nsew")
+            if not self.toolbar.winfo_manager():
+                self.toolbar.pack(fill="x", padx=28, before=self.body)
+            if not self.feedback.winfo_manager():
+                self.feedback.pack(side="bottom", fill="x", before=self.body)
+        else:
+            self.queue_card.grid_remove()
+            self.preview_card.grid_remove()
+            self.empty_card.grid(row=0, column=0, columnspan=3, sticky="nsew", padx=(0, 12))
+            self.toolbar.pack_forget()
+            self.feedback.pack_forget()
+
+    def set_busy(self, busy):
+        self._busy = bool(busy)
+        state = ["disabled"] if busy else ["!disabled"]
+        self.empty_add_button.state(state)
+        self.clear_button.state(state)
+        self.remove_button.state(state)
+        for control in self.option_controls:
+            control.state(state)
+
+    def compression_label(self):
+        pending = self.pending_paths()
+        if not self.files:
+            return self.t("Compress images")
+        if not pending:
+            return self.t("Completed")
+        if self._needs_recompress:
+            return self.t("Recompress")
+        if any(
+            self.file_results.get(path, {}).get("status") in ("failed", "canceled")
+            for path in pending
+        ):
+            return self.t("Retry failed images")
+        return self.t("Compress images")
 
     def arguments(self):
         def dimension(name):
@@ -837,7 +1303,7 @@ class ImageCompressorView(Frame):
             return value or None
 
         return {
-            "paths": list(self.files),
+            "paths": self.pending_paths(),
             "format": self.variables["format"].get().casefold(),
             "quality": int(float(self.variables["quality"].get() or 82)),
             "max_width": dimension("max_width"),
@@ -854,22 +1320,21 @@ class ImageCompressorView(Frame):
         return arguments
 
     def set_files(self, paths):
-        self.files = list(dict.fromkeys(map(str, paths)))
-        self.queue.set_items(
-            [
-                Item(path, Path(path).name, Path(path).suffix.removeprefix(".").upper())
-                for path in self.files
-            ]
-        )
-        self.queue_count.configure(
-            text=(
-                self.t("No images selected")
-                if not self.files
-                else f"{len(self.files)} {self.t('images selected')}"
-            )
-        )
+        previous = set(self.files)
+        self.files = list(dict.fromkeys(str(Path(path).resolve()) for path in paths))
+        self.file_results = {p: r for p, r in self.file_results.items() if p in self.files}
+        self._update_queue()
+        self.buttons["import_images"].configure(variant="secondary" if self.files else "primary")
         if not self.files:
+            self.queue_count.configure(text=self.t("No images selected"))
+        if not self.files:
+            self.file_results = {}
+            self.output_directories = []
+            self._batch_paths = []
+            self._needs_recompress = False
             self.selected_path = None
+            self._clear_preview_images()
+            self._photos = []
             self._preview_paths = None
             self.preview_image.configure(
                 image="", text=self.t("A compressed preview will appear automatically")
@@ -877,7 +1342,17 @@ class ImageCompressorView(Frame):
             self.preview_summary.configure(
                 text=self.t("Add one or more JPEG, PNG, or WebP images to begin.")
             )
+            self.batch_progress.pack_forget()
+            self.open_output.pack_forget()
+            self.next_batch.pack_forget()
+            self.result.configure(
+                text=self.t("Compressed files are saved beside the originals.")
+            )
+            self._sync_layout()
             return
+        if set(self.files) != previous:
+            self._show_ready_feedback()
+        self._sync_layout()
         selected = self.selected_path if self.selected_path in self.files else self.files[0]
         self.selected_path = None
         self.queue.tree.selection_set(selected)
@@ -885,7 +1360,10 @@ class ImageCompressorView(Frame):
         self._select_file(selected)
 
     def show_preview(self, before, after, metadata):
-        self._preview_paths = (Path(before), Path(after))
+        paths = (Path(before), Path(after))
+        if paths != self._preview_paths:
+            self._clear_preview_images()
+        self._preview_paths = paths
         self.update_idletasks()
         self._render_preview()
         self.preview_summary.configure(text=metadata)
@@ -894,7 +1372,7 @@ class ImageCompressorView(Frame):
 class GenericToolView(Frame):
     def __init__(self, master, *, fields, title, on_run, theme):
         super().__init__(master, theme=theme)
-        card = Card(self, theme=theme)
+        card = ContentCard(self, theme=theme)
         card.pack(fill="both", expand=True, padx=18, pady=18)
         Label(card, text=title, theme=theme).pack(anchor="w", pady=(0, 10))
         self.form = Form(card, fields=fields, theme=theme)
@@ -930,17 +1408,6 @@ class PluginManagerView(Frame):
         self._all_records: tuple[dict[str, Any], ...] = ()
         self._filter = "all"
 
-        top_nav = Surface(self, role="background", theme=theme)
-        top_nav.pack(fill="x", padx=28, pady=(18, 0))
-        Button(
-            top_nav,
-            text=self.t("Home"),
-            command=on_home,
-            theme=theme,
-            variant="link",
-            icon="home",
-        ).pack(side="left")
-
         header = _page_header(
             self,
             title=self.t("Plugin center"),
@@ -948,9 +1415,21 @@ class PluginManagerView(Frame):
             icon="plugin",
             theme=theme,
         )
-        header.pack(fill="x", padx=28, pady=(12, 18))
-        self.install_button = Button(
+        self.home_button = Button(
             header,
+            text=self.t("Home"),
+            icon="home",
+            variant="ghost",
+            command=on_home,
+            theme=theme,
+        )
+        self.home_button.configure(icon="chevron-left")
+        self.home_button.pack(side="left", before=header.winfo_children()[0], padx=(0, 16))
+        header.pack(fill="x", padx=28, pady=(28, 18))
+        controls = Toolbar(self, theme=theme, padding=(0, 12))
+        controls.pack(fill="x", padx=28, pady=(0, 8))
+        self.install_button = Button(
+            controls,
             text=self.t("Install local bundle"),
             command=on_install,
             theme=theme,
@@ -959,26 +1438,28 @@ class PluginManagerView(Frame):
         )
         self.install_button.pack(side="right")
         self.restore_button = Button(
-            header,
+            controls,
             text=self.t("Restore default tools"),
             command=on_restore,
             theme=theme,
             variant="secondary",
         )
-        controls = Toolbar(self, theme=theme, padding=(0, 16))
-        controls.pack(fill="x", padx=28)
         self.search = SearchEntry(
             controls,
             on_change=self._search,
             placeholder=self.t("Search installed plugins"),
             theme=theme,
-            width=34,
+            width=25,
         )
         self.search.pack(side="left")
         self.filter_var = tk.StringVar(master=self, value="all")
         self.filter_control = SegmentedControl(
             controls,
-            values=(("all", self.t("All")), ("enabled", self.t("Enabled")), ("disabled", self.t("Disabled"))),
+            values=(
+                ("all", self.t("All")),
+                ("enabled", self.t("Enabled")),
+                ("disabled", self.t("Disabled")),
+            ),
             variable=self.filter_var,
             command=lambda: self._set_filter(self.filter_var.get()),
             theme=theme,
@@ -986,15 +1467,18 @@ class PluginManagerView(Frame):
         )
         self.filter_control.pack(side="left", padx=(12, 0))
 
-        content = Surface(self, role="background", theme=theme)
+        content = PaddedSurface(self, role="background", theme=theme)
         content.pack(fill="both", expand=True, padx=28, pady=(0, 28))
-        content.columnconfigure(0, minsize=300)
+        content.columnconfigure(0, minsize=266)
         content.columnconfigure(1, weight=0)
         content.rowconfigure(0, weight=1)
 
-        list_card = Sidebar(content, theme=theme, padding=(8, 4))
+        list_card = ContentCard(content, theme=theme, width=266, padding=8)
+        self.local_sidebar = list_card
+        list_card.grid_propagate(False)
+        list_card.pack_propagate(False)
         list_card.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        list_header = Surface(list_card, role="sidebar", padding=(18, 16), theme=theme)
+        list_header = PaddedSurface(list_card, role="card", padding=(8, 12), theme=theme)
         list_header.pack(fill="x")
         Label(
             list_header,
@@ -1002,36 +1486,38 @@ class PluginManagerView(Frame):
             variant="section",
             surface="sidebar",
             theme=theme,
-        ).pack(
-            side="left"
-        )
+        ).pack(side="left")
         self.count_badge = Badge(list_header, text="0", variant="secondary", theme=theme)
         self.count_badge.pack(side="right")
         self.plugin_list = ItemList(list_card, theme=theme, on_select=self._selected)
-        self.plugin_list.pack(fill="both", expand=True, padx=10, pady=10)
+        self.plugin_list.pack(fill="both", expand=True, pady=(8, 0))
+        self._refresh_theme()
+        self.plugin_list.tree.column("#0", width=242, minwidth=100, stretch=True)
 
         Separator(content, orient="vertical", theme=theme).grid(row=0, column=1, sticky="ns")
         content.columnconfigure(2, weight=1)
-        self.detail_card = Surface(content, role="background", padding=(24, 4), theme=theme)
+        self.detail_card = ContentCard(content, padding=22, theme=theme)
         self.detail_card.grid(row=0, column=2, sticky="nsew")
-        detail_header = Surface(self.detail_card, role="background", theme=theme)
+        detail_header = PaddedSurface(self.detail_card, role="card", theme=theme)
         detail_header.pack(fill="x")
         Icon(
             detail_header,
             name="plugin",
             size=34,
             color=theme.tokens["primary"],
-            background=self.winfo_toplevel().cget("background"),
+
             theme=theme,
-        ).pack(
-            side="left", padx=(0, 14)
-        )
-        names = Surface(detail_header, role="background", theme=theme)
+        ).pack(side="left", padx=(0, 14))
+        names = PaddedSurface(detail_header, role="card", theme=theme)
         names.pack(side="left", fill="x", expand=True)
-        self.name_label = Label(names, variant="title", theme=theme)
+        self.name_label = Label(names, variant="section", wraplength=280, theme=theme)
         self.name_label.pack(anchor="w")
-        self.enabled_badge = Badge(names, text=self.t("Enabled"), variant="primary", theme=theme)
-        self.disabled_badge = Badge(names, text=self.t("Disabled"), variant="secondary", theme=theme)
+        self.enabled_badge = Label(
+            names, text="●  " + self.t("Enabled"), variant="muted", theme=theme
+        )
+        self.disabled_badge = Label(
+            names, text="○  " + self.t("Disabled"), variant="muted", theme=theme
+        )
         self.enable_button = Button(
             detail_header,
             text=self.t("Enable"),
@@ -1047,44 +1533,59 @@ class PluginManagerView(Frame):
             variant="secondary",
         )
 
-        Surface(self.detail_card, role="background", padding=4, theme=theme).pack(fill="x")
+        Separator(self.detail_card, theme=theme).pack(fill="x", pady=(18, 10))
+        self.danger_actions = PaddedSurface(self.detail_card, role="card", theme=theme)
+        self.danger_actions.pack(side="bottom", fill="x", pady=(14, 0))
+        details = ScrollArea(self.detail_card, theme=theme)
+        details.canvas.configure(highlightthickness=0, borderwidth=0)
+        details.pack(fill="both", expand=True)
+        self.details_body = details.content
+        self.details_body.configure(padding=(2, 8))
+        self.description_label = Label(
+            self.details_body, variant="muted", wraplength=440, theme=theme
+        )
+        self.commands_label = Label(self.details_body, variant="muted", wraplength=440, theme=theme)
         self.summary_label = Label(
-            self.detail_card,
+            self.details_body,
             text=self.t("Plugin details"),
             variant="section",
             theme=theme,
         )
-        self.version_label = Label(self.detail_card, theme=theme)
-        self.id_label = Label(self.detail_card, variant="muted", theme=theme)
-        self.source_label = Label(self.detail_card, theme=theme)
-        self.runtime_label = Label(self.detail_card, theme=theme)
-        self.data_label = Label(self.detail_card, variant="muted", theme=theme, wraplength=700)
-        self.capabilities_label = Label(self.detail_card, variant="muted", theme=theme, wraplength=700)
+        self.version_label = Label(self.details_body, theme=theme)
+        self.id_label = Label(self.details_body, variant="muted", theme=theme)
+        self.source_label = Label(self.details_body, theme=theme)
+        self.runtime_label = Label(self.details_body, theme=theme)
+        self.data_label = Label(self.details_body, variant="muted", theme=theme, wraplength=700)
+        self.capabilities_label = Label(
+            self.details_body, variant="muted", theme=theme, wraplength=700
+        )
         self.summary_label.pack(anchor="w", pady=(8, 12))
+        self.description_label.pack(anchor="w", pady=(0, 18), before=self.summary_label)
         for detail_label in (self.version_label, self.source_label, self.runtime_label):
             detail_label.pack(anchor="w", pady=(0, 8))
         self.access_label = Label(
-            self.detail_card,
+            self.details_body,
             text=self.t("Data and permissions"),
             variant="section",
             theme=theme,
         )
-        self.access_label.pack(anchor="w", pady=(16, 10))
+        self.commands_label.pack(anchor="w", pady=(8, 12))
+        self.access_label.pack(anchor="w", pady=(20, 12))
         for detail_label in (self.id_label, self.data_label, self.capabilities_label):
             detail_label.pack(anchor="w", pady=(0, 7))
         self.disable_hint = Label(
-            self.detail_card,
+            self.details_body,
             text=self.t("Disabling removes this plugin from home, the sidebar, and search."),
             variant="muted",
             theme=theme,
             wraplength=700,
         )
-        self.action_separator = Separator(self.detail_card, theme=theme)
+        self.action_separator = Separator(self.danger_actions, theme=theme)
         self.danger_label = Label(
-            self.detail_card, text=self.t("Danger zone"), variant="section", theme=theme
+            self.danger_actions, text=self.t("Danger zone"), variant="section", theme=theme
         )
         self.uninstall_button = Button(
-            self.detail_card,
+            self.danger_actions,
             text=self.t("Uninstall"),
             command=lambda: on_manage("uninstall"),
             theme=theme,
@@ -1092,14 +1593,44 @@ class PluginManagerView(Frame):
             icon="trash",
         )
         self.delete_button = Button(
-            self.detail_card,
+            self.danger_actions,
             text=self.t("Delete saved data"),
             command=lambda: on_manage("delete"),
             theme=theme,
             variant="destructive",
             icon="trash",
         )
+        self.details_body.bind("<Configure>", self._wrap_details, add="+")
         self._show_empty()
+
+    def _refresh_theme(self):
+        if not hasattr(self, "plugin_list"):
+            return
+        theme = self.theme
+        list_style = theme.name("Plugin.Treeview")
+        theme.style.configure(
+            list_style,
+            rowheight=theme.px(68),
+
+            fieldbackground=theme.tokens["card"],
+        )
+        theme.style.map(
+            list_style,
+            background=[("selected", theme.tokens["accent"])],
+            foreground=[("selected", theme.tokens["accent_foreground"])],
+        )
+        self.plugin_list.tree.configure(style=list_style)
+
+    def _wrap_details(self, event):
+        for label in (
+            self.data_label,
+            self.capabilities_label,
+            self.id_label,
+            self.disable_hint,
+            self.description_label,
+            self.commands_label,
+        ):
+            label.configure(wraplength=max(180, event.width - 28))
 
     def _set_filter(self, value):
         self._filter = value
@@ -1130,6 +1661,11 @@ class PluginManagerView(Frame):
                 for r in records
             ]
         )
+        for record in records:
+            self.plugin_list.tree.item(
+                record["id"],
+                text=f"{record['manifest']['name']}\n{self.t('Enabled') if record['enabled'] else self.t('Disabled')}  ·  {record['manifest']['version']}",
+            )
         ids = tuple(self.records)
         if ids:
             selected = self.plugin_list.selected_id()
@@ -1145,6 +1681,8 @@ class PluginManagerView(Frame):
     def _show_empty(self):
         self.name_label.configure(text=self.t("Select a plugin"))
         for label in (
+            self.description_label,
+            self.commands_label,
             self.version_label,
             self.id_label,
             self.source_label,
@@ -1176,6 +1714,17 @@ class PluginManagerView(Frame):
             return
         manifest = record["manifest"]
         self.name_label.configure(text=manifest["name"])
+        self.description_label.configure(
+            text=self.t(
+                manifest.get("description")
+                or "All processing happens locally. Your data never leaves this device."
+            )
+        )
+        commands = record.get("descriptor", {}).get("commands", [])
+        self.commands_label.configure(
+            text="  ·  ".join(self.t(command.get("title", command["id"])) for command in commands)
+        )
+        self.description_label.pack_forget()
         self.version_label.configure(text=f"{self.t('Version')}: {manifest['version']}")
         self.id_label.configure(text=f"{self.t('Plugin ID')}: {record['id']}")
         self.source_label.configure(
@@ -1193,9 +1742,11 @@ class PluginManagerView(Frame):
         self.enabled_badge.pack_forget()
         self.disabled_badge.pack_forget()
         self.summary_label.pack(anchor="w", pady=(8, 12))
+        self.description_label.pack(anchor="w", pady=(0, 18), before=self.summary_label)
         for detail_label in (self.version_label, self.source_label, self.runtime_label):
             detail_label.pack(anchor="w", pady=(0, 8))
-        self.access_label.pack(anchor="w", pady=(16, 10))
+        self.commands_label.pack(anchor="w", pady=(8, 12))
+        self.access_label.pack(anchor="w", pady=(20, 12))
         for detail_label in (self.id_label, self.data_label, self.capabilities_label):
             detail_label.pack(anchor="w", pady=(0, 7))
         (self.enabled_badge if record["enabled"] else self.disabled_badge).pack(
@@ -1208,12 +1759,15 @@ class PluginManagerView(Frame):
         (self.disable_button if record["enabled"] else self.enable_button).pack(
             side="right", padx=(8, 0), before=self.name_label.master
         )
-        self.danger_label.pack(anchor="w", pady=(0, 8))
+        self.danger_label.pack(side="left")
         self.uninstall_button.pack(side="right", padx=(8, 0))
         self.delete_button.pack(side="right")
 
     def set_records(self, records: list[dict[str, Any]] | tuple[dict[str, Any], ...]):
-        self._all_records = tuple(records)
+        records = tuple(records)
+        if records == self._all_records:
+            return
+        self._all_records = records
         self._apply_filter()
         installed = {record["id"] for record in self._all_records}
         if self.bundled_plugin_ids <= installed:
@@ -1246,7 +1800,7 @@ class PluginManagerView(Frame):
             widget.state(state)
 
 
-class SettingsView(Frame):
+class SettingsView(PaddedSurface):
     """Categorized settings page with its own local navigation."""
 
     LANGUAGE_IDS = ("system", "en", "zh-CN")
@@ -1283,20 +1837,24 @@ class SettingsView(Frame):
             icon="settings",
             theme=theme,
         )
+        self.home_button = Button(
+            header,
+            text=self.t("Home"),
+            icon="home",
+            variant="ghost",
+            command=on_home,
+            theme=theme,
+        )
+        self.home_button.configure(icon="chevron-left")
+        self.home_button.pack(side="left", before=header.winfo_children()[0], padx=(0, 16))
         header.pack(fill="x", padx=28, pady=(24, 18))
-        body = Surface(self, role="background", theme=theme)
+        body = PaddedSurface(self, role="background", theme=theme)
         body.pack(fill="both", expand=True, padx=28, pady=20)
-        nav = Sidebar(body, theme=theme, width=220, padding=12)
+        nav = ContentCard(body, theme=theme, width=184, padding=10)
+        self.local_sidebar = nav
         nav.pack(side="left", fill="y", padx=(0, 14))
         nav.pack_propagate(False)
         self.nav_buttons = {}
-        NavigationItem(
-            nav,
-            text=self.t("Home"),
-            command=on_home,
-            theme=theme,
-            icon="home",
-        ).pack(fill="x", pady=(0, 8))
         for label, target, icon in (
             ("General", "general", "settings"),
             ("Appearance", "appearance", "image"),
@@ -1316,10 +1874,10 @@ class SettingsView(Frame):
             self.nav_buttons[target] = button
 
         Separator(body, orient="vertical", theme=theme).pack(side="left", fill="y")
-        viewport = ScrollArea(body, theme=theme, resize_debounce_ms=60)
+        viewport = ScrollArea(body, theme=theme, bordered=False, resize_debounce_ms=60)
         viewport.pack(side="left", fill="both", expand=True)
         self.content = viewport.content
-        self.content.configure(padding=(0, 0, 8, 8))
+        self.content.configure(padding=(16, 0, 8, 8))
         self.sections = {}
 
         general = self._section(
@@ -1334,7 +1892,7 @@ class SettingsView(Frame):
         )
         row.pack(fill="x")
         self.language_select = Select(
-            row, textvariable=self.language_var, state="readonly", width=24, theme=theme
+            row, textvariable=self.language_var, state="readonly", width=18, theme=theme
         )
         self.language_select.pack(side="right", padx=(18, 0))
         self.language_select.bind("<<ComboboxSelected>>", lambda _event: on_language())
@@ -1384,7 +1942,7 @@ class SettingsView(Frame):
         )
         row.pack(fill="x")
         self.mode_select = Select(
-            row, textvariable=self.mode_var, state="readonly", width=24, theme=theme
+            row, textvariable=self.mode_var, state="readonly", width=18, theme=theme
         )
         self.mode_select.pack(side="right", padx=(18, 0))
         self.mode_select.bind("<<ComboboxSelected>>", lambda _event: on_mode())
@@ -1452,6 +2010,7 @@ class SettingsView(Frame):
             theme=theme,
         )
         row.pack(fill="x")
+        Icon(row, source=Path(__file__).parent / "assets/logo-ui.svg", size=42, theme=theme).pack(side="right", padx=16)
         Separator(about, theme=theme).pack(fill="x")
         Label(about, text=self.t("License: MIT"), theme=theme).pack(anchor="w", pady=(14, 4))
         Label(
@@ -1461,11 +2020,16 @@ class SettingsView(Frame):
             theme=theme,
         ).pack(anchor="w")
 
+        import webbrowser
+        Button(about, text=self.t("Source repository"), variant="ghost",
+               command=lambda: webbrowser.open("https://github.com/openHacking/PyDeskTools"),
+               theme=theme).pack(anchor="w", pady=(14, 0))
+
         self.configure_options(language_preference, mode_preference)
         self.show_section("general")
 
     def _section(self, identifier, title, subtitle):
-        frame = Card(self.content, theme=self.theme, padding=24)
+        frame = ContentCard(self.content, theme=self.theme, padding=24)
         _section_heading(
             frame,
             title=self.t(title),

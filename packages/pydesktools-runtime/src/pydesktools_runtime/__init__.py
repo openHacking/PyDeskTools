@@ -2,5 +2,5 @@
 
 from .services import CloseHandle, RuntimeConfig, ServiceContainer, TaskHandle, create_services
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = ["RuntimeConfig", "ServiceContainer", "TaskHandle", "CloseHandle", "create_services"]

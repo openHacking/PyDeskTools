@@ -9,6 +9,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from build_support import verify_builder
+from packaging.tags import sys_tags
 from packaging.utils import parse_wheel_filename
 from packaging.version import Version
 
@@ -24,9 +26,19 @@ def main():
     parser.add_argument(
         "--offline", action="store_true", help="Require already downloaded wheelhouse"
     )
+    parser.add_argument(
+        "--target",
+        choices=("macos-arm64", "windows-x86_64", "linux-x86_64"),
+        default="macos-arm64",
+        help="Platform label embedded in the first-party plugin manifests",
+    )
     args = parser.parse_args()
-    wheels = ROOT / "build/wheelhouse"
+    verify_builder(args.target)
+    wheels = ROOT / "build/wheelhouse" / args.target
     wheels.mkdir(parents=True, exist_ok=True)
+    if not args.offline:
+        for stale_wheel in wheels.glob("*.whl"):
+            stale_wheel.unlink()
     for package in (
         "packages/pydesktools-sdk",
         "plugins/json-tools",
@@ -58,29 +70,29 @@ def main():
             "Pillow==12.3.0",
         )
     manifests = {
-        "json-tools.pdtplugin": """schema = 1
+        "json-tools.pdtplugin": f"""schema = 1
 id = "org.pydesk.json-tools"
 name = "JSON Tools"
-version = "0.1.0"
+version = "0.1.1"
 distribution = "pydesk-json-tools"
 entrypoint = "pydesk_json_tools:create_plugin"
 requires_python = ">=3.13,<3.14"
-requires_sdk = ">=0.1,<0.2"
+requires_sdk = ">=0.1.1,<0.2"
 protocol = 1
-platforms = ["macos-arm64"]
+platforms = ["{args.target}"]
 languages = ["en", "zh-CN"]
 capabilities = ["dialogs.open_file", "dialogs.save_file", "clipboard.write"]
 """,
-        "image-compressor.pdtplugin": """schema = 1
+        "image-compressor.pdtplugin": f"""schema = 1
 id = "org.pydesk.image-compressor"
 name = "Image Compressor"
-version = "0.2.0"
+version = "0.2.2"
 distribution = "pydesk-image-compressor"
 entrypoint = "pydesk_image_compressor:create_plugin"
 requires_python = ">=3.13,<3.14"
-requires_sdk = ">=0.1,<0.2"
+requires_sdk = ">=0.1.1,<0.2"
 protocol = 1
-platforms = ["macos-arm64"]
+platforms = ["{args.target}"]
 languages = ["en", "zh-CN"]
 capabilities = ["dialogs.open_files"]
 """,
@@ -93,9 +105,14 @@ capabilities = ["dialogs.open_files"]
             "pillow",
         ),
     }
+    compatible_tags = set(sys_tags())
     available: dict[str, tuple[Version, Path]] = {}
     for wheel in wheels.glob("*.whl"):
-        name, version, _, _ = parse_wheel_filename(wheel.name)
+        name, version, _, tags = parse_wheel_filename(wheel.name)
+        if not tags.intersection(compatible_tags):
+            raise RuntimeError(
+                f"Wheel {wheel.name} is incompatible with the native {args.target} builder"
+            )
         key = str(name)
         if key not in available or version > available[key][0]:
             available[key] = (version, wheel)

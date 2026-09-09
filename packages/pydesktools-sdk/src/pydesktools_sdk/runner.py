@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import __version__
 from .api import CancellationToken, InvocationContext, PluginContext, PluginError
-from .protocol import descriptor, encode, read, validate, validate_view
+from .protocol import descriptor, encode, read, validate, validate_progress_data, validate_view
 
 
 class HostClient:
@@ -92,6 +92,9 @@ class Worker:
         self.commands = {}
         self.host = HostClient(self)
         self.last_progress = 0.0
+        self.progress_lock = threading.Lock()
+        self.progress_timer = None
+        self.pending_progress = None
         self.stop = False
 
     def send(self, message):
@@ -100,24 +103,38 @@ class Worker:
             self.output.write(payload)
             self.output.flush()
 
-    def progress(self, fraction, message):
-        now = time.monotonic()
-        if now - self.last_progress < 0.1:
-            return
-        if fraction is not None and not 0 <= fraction <= 1:
+    def progress(self, fraction, message, data=None):
+        validate_progress_data(data)
+        if fraction is not None and (isinstance(fraction, bool) or not 0 <= fraction <= 1):
             raise ValueError("Invalid progress fraction")
-        self.last_progress = now
-        self.send(
-            {
-                "jsonrpc": "2.0",
-                "method": "task.progress",
-                "params": {
-                    "task_id": self.task_id,
-                    "fraction": fraction,
-                    "message": str(message)[:4096],
-                },
-            }
-        )
+        params = {"task_id": self.task_id, "fraction": fraction,
+                  "message": str(message)[:1024], **({"data": data} if data is not None else {})}
+        with self.progress_lock:
+            elapsed = time.monotonic() - self.last_progress
+            if elapsed < 0.1:
+                # Keep the latest checkpoint while a long operation runs. Dropping
+                # it would hide already saved files if a later operation is stopped.
+                if data is not None:
+                    self.pending_progress = params
+                    if self.progress_timer is None:
+                        self.progress_timer = threading.Timer(0.1 - elapsed, self._flush_progress)
+                        self.progress_timer.daemon = True
+                        self.progress_timer.start()
+                return
+            if self.progress_timer is not None:
+                self.progress_timer.cancel()
+                self.progress_timer = None
+            self.pending_progress = None
+            self.last_progress = time.monotonic()
+            self.send({"jsonrpc": "2.0", "method": "task.progress", "params": params})
+
+    def _flush_progress(self):
+        with self.progress_lock:
+            self.progress_timer = None
+            params, self.pending_progress = self.pending_progress, None
+            if params and params["task_id"] == self.task_id:
+                self.last_progress = time.monotonic()
+                self.send({"jsonrpc": "2.0", "method": "task.progress", "params": params})
 
     def dispatch(self, method, params):
         if method == "initialize":
@@ -178,7 +195,8 @@ class Worker:
                 params["arguments"],
                 InvocationContext(self.task_id, self.token, self.host, self.progress),
             )
-            self.token.raise_if_cancelled()
+            if not result.data.get("canceled", False):
+                self.token.raise_if_cancelled()
             validate(result.data, command["output_schema"], "result")
             validate_view(result.view, self.commands)
             return asdict(result)
@@ -213,6 +231,10 @@ class Worker:
                 },
             }
         finally:
+            with self.progress_lock:
+                if self.progress_timer is not None:
+                    self.progress_timer.cancel()
+                self.progress_timer = self.pending_progress = None
             self.task_id = None
             self.token = None
             self.busy = False

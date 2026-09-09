@@ -1,8 +1,18 @@
+
 msgid ""
 msgstr ""
-"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-08 14:57+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: zh_CN\n"
+"Language-Team: zh_CN <LL@li.org>\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
 
 msgid "Tools"
 msgstr "工具"
@@ -510,3 +520,117 @@ msgstr "版本与法律信息。"
 
 msgid "Local-first desktop tools powered by isolated plugins."
 msgstr "由隔离插件驱动的本地优先桌面工具。"
+
+msgid "Preview compression"
+msgstr "压缩预览"
+
+msgid "Use result as input"
+msgstr "用结果替换输入"
+
+msgid "Source repository"
+msgstr "源代码仓库"
+
+msgid "Pending"
+msgstr "待压缩"
+
+msgid "Compressing"
+msgstr "压缩中"
+
+msgid "Saved"
+msgstr "已保存"
+
+msgid "Skipped: no reduction"
+msgstr "跳过：体积未减小"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "Canceled"
+msgstr "已取消"
+
+msgid "Skipped"
+msgstr "已跳过"
+
+msgid "Space saved"
+msgstr "节省空间"
+
+msgid "Saved to"
+msgstr "保存位置"
+
+msgid "Open output folder"
+msgstr "打开输出目录"
+
+msgid "Exported"
+msgstr "已导出"
+
+msgid "Show in folder"
+msgstr "在文件夹中显示"
+
+msgid "Done"
+msgstr "完成"
+
+msgid "Clear list"
+msgstr "清空列表"
+
+msgid "Drag images here"
+msgstr "将图片拖到这里"
+
+msgid "Release to add images"
+msgstr "松开即可添加图片"
+
+msgid "JPEG, PNG or WebP · up to 1000 images"
+msgstr "支持 JPEG、PNG、WebP · 最多 1000 张"
+
+msgid "Choose images"
+msgstr "选择图片"
+
+msgid "Images are processed locally and never uploaded."
+msgstr "图片仅在本地处理，不会上传。"
+
+msgid "images ready to compress"
+msgstr "张图片待压缩"
+
+msgid "Completed"
+msgstr "已完成"
+
+msgid "Recompress"
+msgstr "重新压缩"
+
+msgid "Retry failed images"
+msgstr "重试失败项"
+
+msgid "Clear and start next batch"
+msgstr "清空并处理下一批"
+
+msgid "A batch can contain at most 1000 images."
+msgstr "每个批次最多可包含 1000 张图片。"
+
+msgid "Some files could not be added."
+msgstr "部分文件无法添加。"
+
+msgid "Loading preview…"
+msgstr "正在生成预览…"
+
+msgid "Preview unavailable"
+msgstr "无法预览此图片"
+
+msgid "Format JSON"
+msgstr "格式化 JSON"
+
+msgid "Minify JSON"
+msgstr "压缩 JSON"
+
+msgid "Import JSON"
+msgstr "导入 JSON"
+
+msgid "Copy result"
+msgstr "复制结果"
+
+msgid "Export JSON"
+msgstr "导出 JSON"
+
+msgid "Compression preview"
+msgstr "压缩预览"
+
+msgid "Space added"
+msgstr "增加空间"

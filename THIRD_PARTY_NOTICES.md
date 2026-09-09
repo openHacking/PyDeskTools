@@ -1,14 +1,15 @@
 # Third-party notices
 
 Project modules and the JSON plugin use MIT. PyDeskUI is an independent MIT
-library. Host dependencies: packaging (Apache-2.0/BSD-2-Clause), platformdirs (MIT).
+library. Host dependencies: packaging (Apache-2.0/BSD-2-Clause), platformdirs (MIT),
+and tkinterdnd2/TkDND (MIT-style licenses).
 The macOS application additionally uses PyObjC core/Cocoa 12.2.2 (MIT) for
 nonblocking native file panels; it is not a UI-core/runtime/SDK dependency.
 The JSON plugin's simplejson dependency retains MIT/Academic Free License terms
 from its wheel. Its wheel includes upstream license files.
 
 The desktop distribution embeds CPython 3.13.7 from python-build-standalone
-20250918. The verified archive hashes are in runtime-source.json. Native-library
+20250918. The verified archive hashes are in runtime-sources.json. Native-library
 license texts are retained in licenses/THIRD_PARTY_LICENSES.txt; this upstream set
 includes licenses for libraries beyond this particular platform build. CPython,
 Tcl/Tk, OpenSSL, libffi, SQLite, zlib and other bundled components retain their

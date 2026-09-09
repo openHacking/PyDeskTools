@@ -1,5 +1,6 @@
 """Explicit application composition and the macOS-first offline toolbox."""
 
+import gc
 import gettext
 import hashlib
 import json
@@ -8,8 +9,10 @@ import queue
 import sys
 import threading
 import tkinter as tk
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from importlib.resources import files
 from pathlib import Path
 from tkinter import filedialog
@@ -25,7 +28,6 @@ from pydeskui import (
     Icon,
     Item,
     Label,
-    ProgressView,
     Scheduler,
     SearchEntry,
     Separator,
@@ -36,6 +38,7 @@ from pydeskui import (
     TranslationContext,
 )
 
+from ._version import VERSION
 from .platform import PlatformAdapter
 from .ui import (
     GenericToolView,
@@ -45,6 +48,7 @@ from .ui import (
     PluginManagerView,
     SettingsView,
     ToolSidebar,
+    _format_bytes,
     fields_for_schema,
 )
 
@@ -54,7 +58,7 @@ DEFAULT_PLUGINS = {
     PLUGIN: "json-tools.pdtplugin",
     IMAGE_PLUGIN: "image-compressor.pdtplugin",
 }
-DEFAULT_PLUGIN_VERSIONS = {PLUGIN: "0.1.0", IMAGE_PLUGIN: "0.2.0"}
+DEFAULT_PLUGIN_VERSIONS = {PLUGIN: "0.1.1", IMAGE_PLUGIN: "0.2.2"}
 LANGUAGE_PREFERENCES = ("system", "en", "zh-CN")
 THEME_PREFERENCES = ("system", "light", "dark")
 
@@ -96,7 +100,7 @@ def application_tokens(mode):
             "sidebar_primary_foreground": "#FFFFFF",
         }
     return {
-        "background": "#F7F9FC",
+        "background": "#FFFFFF",
         "foreground": "#151922",
         "card": "#FFFFFF",
         "card_foreground": "#151922",
@@ -110,7 +114,7 @@ def application_tokens(mode):
         "accent_foreground": "#1264D1",
         "border": "#E8ECF2",
         "input": "#CDD5E0",
-        "sidebar": "#F7F9FC",
+        "sidebar": "#FFFFFF",
         "sidebar_foreground": "#151922",
         "sidebar_accent": "#EAF3FF",
         "sidebar_accent_foreground": "#1264D1",
@@ -142,11 +146,29 @@ def preferred_theme(root):
     """Resolve the current host appearance, with a safe light fallback."""
     if root.tk.call("tk", "windowingsystem") != "aqua":
         return "light"
+    _follow_system_appearance(root)
     try:
         dark = root.tk.getboolean(root.tk.call("wm", "attributes", root._w, "-isdark"))
     except tk.TclError:
         return "light"
     return "dark" if dark else "light"
+
+
+def _follow_system_appearance(root):
+    """Let macOS, rather than the last fixed theme, control native windows."""
+    if root.tk.call("tk", "windowingsystem") != "aqua":
+        return
+    try:
+        pending = [root]
+        hosts = set()
+        while pending:
+            widget = pending.pop()
+            hosts.add(widget.winfo_toplevel())
+            pending.extend(widget.winfo_children())
+        for host in hosts:
+            host.wm_attributes("-appearance", "auto")
+    except tk.TclError:
+        pass
 
 
 class ApplicationExtension(Protocol):
@@ -159,7 +181,7 @@ class ApplicationExtension(Protocol):
 class ApplicationConfig:
     app_id: str = "org.pydesk.tools"
     display_name: str = "PyDeskTools"
-    version: str = "0.1.0"
+    version: str = VERSION
     data_namespace: str = "PyDeskTools"
     extensions: tuple = ()
     catalog_sources: tuple = ()
@@ -178,6 +200,19 @@ class ViewRegistry:
         return CloseHandle(lambda: self.factories.pop(view_id, None))
 
 
+def packaged_runtime_path(executable, bundle_root=None):
+    executable = Path(executable).resolve()
+    candidates = (
+        executable.parent / "plugin-runtime",
+        executable.parents[1] / "Resources" / "plugin-runtime",
+        Path(bundle_root or executable.parent) / "plugin-runtime",
+    )
+    resource = next((candidate for candidate in candidates if candidate.is_dir()), None)
+    if resource is None:
+        raise RuntimeError("Packaged plugin runtime is missing")
+    return resource
+
+
 def runtime_python(config):
     if config.python:
         return config.python
@@ -187,7 +222,7 @@ def runtime_python(config):
 
         from platformdirs import user_data_path
 
-        resource = Path(sys.executable).resolve().parents[1] / "Resources" / "plugin-runtime"
+        resource = packaged_runtime_path(sys.executable, getattr(sys, "_MEIPASS", None))
         manifest_bytes = (resource / "runtime.json").read_bytes()
         manifest = json.loads(manifest_bytes)
         relative = Path(manifest["executable"])
@@ -228,9 +263,26 @@ class Application:
             raise ValueError("Online catalogs are not implemented in this release")
         self.config = config
         self.root = tk.Tk()
+        self.dnd_available = False
+        self.dnd_version = None
+        try:
+            from tkinterdnd2 import TkinterDnD  # type: ignore[import-untyped]
+
+            self.dnd_version = str(TkinterDnD.require(self.root))
+            self.dnd_available = True
+        except (ImportError, RuntimeError, tk.TclError):
+            # File selection remains the fully supported fallback.
+            pass
         self.root.title(config.display_name)
+        logo_path = Path(__file__).parent / "assets/logo.png"
+        self._application_icon = tk.PhotoImage(master=self.root, file=str(logo_path))
+        self.root.iconphoto(True, self._application_icon)
+        if sys.platform == "darwin":
+            from AppKit import NSApplication, NSImage
+            NSApplication.sharedApplication().setApplicationIconImage_(
+                NSImage.alloc().initWithContentsOfFile_(str(logo_path)))
         self.root.geometry("1280x840")
-        self.root.minsize(960, 680)
+        self.root.minsize(1100, 720)
         self.platform = PlatformAdapter(self.root)
         self.services = create_services(
             RuntimeConfig(
@@ -288,6 +340,10 @@ class Application:
         self.result_artifact = None
         self.result_artifacts = []
         self.image_preview_pending = False
+        self.preview_cache: OrderedDict = OrderedDict()
+        self.preview_request_key = None
+        self.deferred_image_command = None
+        self.settings_origin: tuple[str, str | None] = ("home", None)
         self.closing = False
         self.background_busy = False
         self.busy_visible = False
@@ -314,6 +370,8 @@ class Application:
             ),
         ]
         self._build()
+        if self.theme_preference == "system":
+            _follow_system_appearance(self.root)
         self._key_bindings = [
             ("<Control-k>", self.root.bind("<Control-k>", self.show_command_palette, add="+")),
             ("<Command-k>", self.root.bind("<Command-k>", self.show_command_palette, add="+")),
@@ -351,15 +409,14 @@ class Application:
         self.header = Toolbar(self.workspace_shell, theme=self.theme, height=64, padding=(18, 10))
         self.header.pack(fill="x")
         self.header.pack_propagate(False)
-        brand = Surface(self.header, role="background", width=170, theme=self.theme)
+        brand = Surface(self.header, role="background", width=212, theme=self.theme)
         brand.pack(side="left", fill="y")
         brand.pack_propagate(False)
         Icon(
             brand,
-            name="plugin",
+            source=Path(__file__).parent / "assets/logo-ui.svg",
             size=30,
             color=self.theme.tokens["primary"],
-            background=self.root.cget("background"),
             theme=self.theme,
         ).pack(side="left", pady=7)
         Label(
@@ -401,13 +458,21 @@ class Application:
         )
         self.tools_host = Frame(self.workspace_content, theme=self.theme)
         self.json_tool = JSONToolView(
-            self.tools_host, translate=self.t, on_command=self.run_command, theme=self.theme
+            self.tools_host,
+            translate=self.t,
+            on_command=self.run_command,
+            on_reveal_export=self.reveal_in_file_manager,
+            theme=self.theme,
         )
         self.image_tool = ImageCompressorView(
             self.tools_host,
             translate=self.t,
             on_command=self.run_command,
             on_preview=self.request_image_preview,
+            on_discard=self.discard_image_paths,
+            on_state_change=self.refresh,
+            on_drop=lambda paths: self.run_command("import_images", paths),
+            dnd_available=self.dnd_available,
             theme=self.theme,
         )
         if values:
@@ -432,7 +497,7 @@ class Application:
             language_preference=self.locale_preference,
             mode_preference=self.theme_preference,
             recent_enabled=self.recent_enabled,
-            on_home=lambda: self.navigate("home"),
+            on_home=lambda: self.navigate(*self.settings_origin),
             on_language=self.change_language,
             on_mode=self.change_theme,
             on_recent=self.change_recent,
@@ -450,8 +515,6 @@ class Application:
         self.command_buttons = self.json_tool.command_buttons
         self.detail: Any = self.json_tool.detail
 
-        self.progress = ProgressView(self.app_frame, on_cancel=self.cancel, theme=self.theme)
-        self.progress.update_progress(0, self.t("Working…"))
         self.palette = CommandPalette(
             self.root,
             title=self.t("Quick search"),
@@ -466,6 +529,8 @@ class Application:
         self.refresh()
 
     def navigate(self, page, plugin_id=None):
+        if page == "settings" and self.current_page != "settings":
+            self.settings_origin = (self.current_page, self.current_plugin)
         if page == "tool" and plugin_id:
             record = self.services.store.get(plugin_id)
             if not record or not record["enabled"]:
@@ -473,15 +538,13 @@ class Application:
             else:
                 self.current_plugin = plugin_id
         self.current_page = page
-        for panel in (self.workspace_shell, self.plugins, self.settings):
+        for panel in (self.workspace_shell, self.home, self.tools_host, self.plugins, self.settings):
             panel.pack_forget()
         if page == "home":
             self.workspace_shell.pack(fill="both", expand=True)
-            self.tools_host.pack_forget()
             self.home.pack(fill="both", expand=True)
         elif page == "tool":
             self.workspace_shell.pack(fill="both", expand=True)
-            self.home.pack_forget()
             self.tools_host.pack(fill="both", expand=True)
             self._show_tool(self.current_plugin)
         elif page == "plugins":
@@ -564,31 +627,51 @@ class Application:
             self.events.put(event, timeout=5)
 
     def _schedule_busy_feedback(self, action=None):
+        # Busy is a concurrency guard, never a global visual overlay.
         if action is not None:
             self.active_action = action
-        if self.busy_visible or self.busy_handle is not None:
-            return
-        self.busy_handle = self.scheduler.call_later(150, self._show_busy_feedback)
-
-    def _show_busy_feedback(self):
-        self.busy_handle = None
-        if self.closing or not (self.task or self.background_busy):
-            return
-        self.busy_visible = True
-        self.progress.place(relx=0, rely=1, anchor="sw", relwidth=1)
-        self.progress.update_progress(0, self.t("Working…"))
-        self.refresh()
+        self.busy_visible = bool(self.task or self.background_busy)
 
     def _settle_busy_feedback(self):
-        if self.task or self.background_busy:
-            return
-        if self.busy_handle is not None:
-            self.busy_handle.cancel()
-            self.busy_handle = None
-        self.busy_visible = False
-        self.active_action = None
-        self.progress.place_forget()
+        self.busy_visible = bool(self.task or self.background_busy)
+        if not self.busy_visible:
+            self.active_action = None
         self.refresh()
+
+    def _preview_key(self):
+        arguments = self.image_tool.preview_arguments()
+        path = Path(arguments["path"])
+        stat = path.stat()
+        return (str(path.resolve()), stat.st_mtime_ns, stat.st_size,
+                json.dumps(arguments, sort_keys=True))
+
+    def discard_image_paths(self, paths):
+        discarded = {str(Path(path).resolve()) for path in paths}
+        for key in list(self.preview_cache):
+            if key[0] not in discarded:
+                continue
+            reference, *_ = self.preview_cache.pop(key)
+            self.services.artifacts.release(reference)
+        if self.preview_request_key and self.preview_request_key[0] in discarded:
+            self.preview_request_key = None
+        if not self.image_tool.files:
+            self.image_preview_pending = False
+
+    def _load_json_input(self, identifier, reference=None):
+        path = self.services.artifacts.path(PLUGIN, identifier)
+        def load():
+            try:
+                text = path.read_bytes().decode("utf-8")
+                self.events.put({"type": "json_loaded", "text": text})
+            finally:
+                if reference:
+                    self.services.artifacts.release(reference)
+        self._background(load)
+
+    def _clear_json_result(self):
+        if self.result_task:
+            self.services.artifacts.release("result:" + self.result_task)
+        self.result_task = self.result_artifact = None
 
     def _poll(self):
         if self.closing:
@@ -596,8 +679,8 @@ class Application:
         self.platform.drain()
         if self.progress_event:
             event, self.progress_event = self.progress_event, None
-            if self.busy_visible and self.task and event.get("task_id") == self.task.id:
-                self.progress.update_progress(event.get("fraction"), event.get("message", ""))
+            if self.task and event.get("task_id") == self.task.id and self.active_action == "compress":
+                self.image_tool.batch_update(event.get("data", {}), event.get("fraction"))
         for _ in range(32):
             try:
                 event = self.events.get_nowait()
@@ -630,6 +713,10 @@ class Application:
                         lambda: self.services.install(p, consent=True, token=self.background_token)
                     ),
                 )
+            elif event["type"] == "json_loaded":
+                self.json_tool.clear()
+                self.json_tool.form.set_values({"text": event["text"]})
+                self._clear_json_result()
             elif event["type"] == "prepared":
                 try:
                     self.task = self.services.commands.submit(
@@ -643,12 +730,16 @@ class Application:
                 if event.get("error"):
                     self.error(event["error"])
                 self._settle_busy_feedback()
+                if self.image_preview_pending:
+                    self.scheduler.call_later(0, self.request_image_preview)
             elif self.task and event.get("task_id") == self.task.id:
                 if event["type"] in ("completed", "failed"):
                     completed_action = self.active_action
+                    task_plugin = self.task.plugin_id
+                    target_detail = self.json_tool.detail if task_plugin == PLUGIN else self.detail
                     if event["type"] == "completed":
                         result = event["result"]
-                        if result["data"].get("artifact_id"):
+                        if completed_action != "import" and result["data"].get("artifact_id"):
                             if self.result_task:
                                 self.services.artifacts.release("result:" + self.result_task)
                             self.result_task = self.task.id
@@ -656,19 +747,44 @@ class Application:
                         data = result["data"]
                         view = result.get("view")
                         if completed_action == "import_images" and "files" in data:
-                            self.image_tool.set_files(item["path"] for item in data["files"])
+                            imported = [item["path"] for item in data["files"]]
+                            combined = list(dict.fromkeys([*self.image_tool.files, *imported]))
+                            if len(combined) > 1000:
+                                self.error(self.t("A batch can contain at most 1000 images."))
+                            else:
+                                self.image_tool.set_files(combined)
+                            rejected = data.get("rejected", [])
+                            if rejected:
+                                names = ", ".join(Path(item["path"]).name for item in rejected[:5])
+                                message = self.t("Some files could not be added.") + "\n" + names
+                                if len(rejected) > 5:
+                                    message += f" +{len(rejected) - 5}"
+                                self.error(message)
                         elif completed_action == "preview" and view:
-                            self._show_image_preview(data, view)
+                            self._show_image_preview(data, view, event.get("session_id"))
+                        elif completed_action == "compress":
+                            self.image_tool.finish_batch(data)
+                        elif completed_action == "import" and data.get("artifact_id"):
+                            self._load_json_input(data["artifact_id"], "result:" + self.task.id)
                         elif view and view.get("type") == "detail":
-                            self.detail.set_content(
+                            target_detail.set_content(
                                 view["title"], view.get("body", ""), view.get("format", "text")
                             )
-                            if self.current_plugin == PLUGIN:
+                            if task_plugin == PLUGIN:
                                 self.json_tool.output_badge.configure(text=self.t("Formatted"))
                         if completed_action == "copy":
                             self.toast.show(text=self.t("Copied to clipboard"))
-                        if completed_action not in ("copy", "export"):
-                            self._remember(self.current_plugin, completed_action)
+                        elif (
+                            completed_action == "export"
+                            and not data.get("canceled")
+                            and data.get("path")
+                        ):
+                            self.json_tool.show_export_success(data["path"])
+                            self.toast.show(
+                                text=f"{self.t('Exported')}: {Path(data['path']).name}"
+                            )
+                        if completed_action not in ("copy", "export", "preview") and not data.get("canceled"):
+                            self._remember(task_plugin, completed_action)
                     else:
                         failure = event["error"]
                         data = failure.get("data", {})
@@ -677,14 +793,38 @@ class Application:
                             if "line" in data
                             else ""
                         )
-                        self.detail.set_content(self.t("Error"), failure["message"] + suffix)
-                        if self.current_plugin == PLUGIN:
+                        if completed_action == "compress":
+                            status = "canceled" if data.get("kind") in ("canceled", "forced_stop") else "failed"
+                            items = [self.image_tool.file_results.get(path, {}) for path in self.image_tool.files]
+                            items = [item if item.get("status") in ("completed", "skipped_larger", "failed") else
+                                     {"source": path, "status": status} for path, item in zip(self.image_tool.files, items)]
+                            self.image_tool.finish_batch({"items": items})
+                        elif completed_action == "preview":
+                            if not self.image_preview_pending:
+                                self.image_tool.preview_image.configure(image="", text=self.t("Preview unavailable"))
+                        elif completed_action in ("import", "copy", "export"):
+                            self.error(failure["message"] + suffix)
+                        else:
+                            if completed_action in ("format", "minify"):
+                                self._clear_json_result()
+                            target_detail.set_content(self.t("Error"), failure["message"] + suffix)
+                        if task_plugin == PLUGIN and completed_action in ("format", "minify"):
                             self.json_tool.output_badge.configure(text=self.t("Error"))
                     self.task = None
                     self._settle_busy_feedback()
-                    if self.image_preview_pending:
+                    if self.deferred_image_command:
+                        deferred, self.deferred_image_command = self.deferred_image_command, None
+                        self.scheduler.call_later(
+                            0, partial(self._run_deferred_image_command, deferred)
+                        )
+                    elif self.image_preview_pending:
                         self.scheduler.call_later(0, self.request_image_preview)
         self.scheduler.call_later(25, self._poll)
+
+    def _run_deferred_image_command(self, deferred):
+        if self.current_page == "tool" and self.current_plugin == IMAGE_PLUGIN:
+            command, paths = deferred
+            self.run_command(command, paths)
 
     def request_image_preview(self):
         """Coalesce selection and setting changes into the latest useful preview."""
@@ -700,19 +840,48 @@ class Application:
         ):
             return
         self.image_preview_pending = False
-        self.run_command("preview")
+        try:
+            key = self._preview_key()
+            if key in self.preview_cache:
+                entry = self.preview_cache[key]
+                self.preview_cache.move_to_end(key)
+                self.image_tool.show_preview(*entry[1:])
+                return
+            self.preview_request_key = key
+            self.run_command("preview")
+        except (OSError, ValueError, tk.TclError):
+            self.image_tool.preview_image.configure(image="", text=self.t("Preview unavailable"))
 
-    def _show_image_preview(self, data, view):
-        self.services.artifacts.release("image-preview")
-        self.result_artifacts = [data["before_artifact_id"], data["after_artifact_id"]]
+    def _show_image_preview(self, data, view, session=None):
+        identifiers = [data["before_artifact_id"], data["after_artifact_id"]]
+        try:
+            current_key = self._preview_key()
+        except (OSError, ValueError, tk.TclError):
+            current_key = None
+        key = self.preview_request_key
+        if key != current_key:
+            if session:
+                for identifier in identifiers:
+                    self.services.artifacts.release(session, identifier)
+            return
+        reference = "image-preview:" + identifiers[0]
         paths = []
-        for identifier in self.result_artifacts:
-            self.services.artifacts.acquire(IMAGE_PLUGIN, identifier, "image-preview")
+        for identifier in identifiers:
+            self.services.artifacts.acquire(IMAGE_PLUGIN, identifier, reference)
             paths.append(self.services.artifacts.path(IMAGE_PLUGIN, identifier))
+            if session:
+                self.services.artifacts.release(session, identifier)
         metadata = view.get("metadata", {})
-        summary = self.t("Original") + f": {metadata.get('original_bytes', 0):,} B\n"
-        summary += self.t("Estimated") + f": {metadata.get('estimated_bytes', 0):,} B\n"
+        summary = self.t("Original") + f": {_format_bytes(metadata.get('original_bytes', 0))} · "
+        summary += self.t("Estimated") + f": {_format_bytes(metadata.get('estimated_bytes', 0))}\n"
         summary += f"{metadata.get('width', 0)} × {metadata.get('height', 0)} px"
+        previous = self.preview_cache.pop(key, None)
+        if previous:
+            self.services.artifacts.release(previous[0])
+        self.preview_cache[key] = (reference, paths[0], paths[1], summary)
+        while len(self.preview_cache) > 12:
+            _, entry = self.preview_cache.popitem(last=False)
+            self.services.artifacts.release(entry[0])
         self.image_tool.show_preview(paths[0], paths[1], summary)
 
     def _remember(self, plugin_id, command_id):
@@ -808,6 +977,7 @@ class Application:
         enabled = [record for record in records if record["enabled"]]
         self.plugins.set_records(records)
         self.plugins.set_running(self.services._workers)
+        self.busy_visible = bool(self.task or self.background_busy)
         self.plugins.set_busy(self.busy_visible)
         self.sidebar.set_records(
             enabled,
@@ -828,14 +998,26 @@ class Application:
                 usable = usable and self.result_artifact is not None
             button.state(["!disabled"] if usable else ["disabled"])
         for name, button in self.image_tool.buttons.items():
-            usable = ready and not self.busy_visible
+            usable = ready and (not self.busy_visible or self.active_action == "preview")
             if name == "compress":
-                usable = usable and bool(self.image_tool.files)
+                usable = usable and bool(self.image_tool.pending_paths())
+                button.configure(text=self.image_tool.compression_label())
             button.state(["!disabled"] if usable else ["disabled"])
+
+        self.image_tool.set_busy(self.active_action == "compress")
 
     @staticmethod
     def _normalized(value):
         return " ".join(value.casefold().replace("_", " ").replace("-", " ").split())
+
+    def _command_title(self, plugin, command):
+        titles = {
+            PLUGIN: {"format": "Format JSON", "minify": "Minify JSON", "import": "Import JSON",
+                     "copy": "Copy result", "export": "Export JSON"},
+            IMAGE_PLUGIN: {"import_images": "Add images", "preview": "Compression preview",
+                           "compress": "Compress images"},
+        }
+        return self.t(titles.get(plugin, {}).get(command["id"], command["title"]))
 
     def _search(self, text, target):
         query = self._normalized(text)
@@ -872,7 +1054,7 @@ class Application:
                         score,
                         Item(
                             identifier,
-                            command["title"],
+                            self._command_title(record["id"], command),
                             record["manifest"]["name"],
                         ),
                     )
@@ -904,7 +1086,7 @@ class Application:
                 items.append(
                     Item(
                         entry["plugin_id"] + ":" + entry["command_id"],
-                        command["title"],
+                        self._command_title(record["id"], command),
                         record["manifest"]["name"],
                     )
                 )
@@ -928,13 +1110,17 @@ class Application:
         except Exception as error:
             self.error(str(error))
 
-    def run_command(self, command):
+    def run_command(self, command, image_paths: list[str] | tuple[str, ...] | None = None):
+        if self.task and self.active_action == "preview" and self.current_plugin == IMAGE_PLUGIN and command != "preview":
+            self.deferred_image_command = (command, image_paths)
+            return True
         if self.task or self.background_busy:
-            return
+            return False
         try:
+            arguments: dict[str, Any]
             if self.current_plugin == IMAGE_PLUGIN:
                 if command == "import_images":
-                    arguments = {}
+                    arguments = {"paths": list(image_paths)} if image_paths is not None else {}
                 elif command == "preview":
                     arguments = self.image_tool.preview_arguments()
                     arguments = {
@@ -945,10 +1131,15 @@ class Application:
                     arguments = {
                         key: value for key, value in arguments.items() if value is not None
                     }
+                    if command == "compress" and not arguments.get("paths"):
+                        self.refresh()
+                        return False
                 self.task = self.services.commands.submit(IMAGE_PLUGIN, command, arguments)
+                if command == "compress":
+                    self.image_tool.begin_batch(arguments["paths"], self.cancel)
                 self._schedule_busy_feedback(command)
                 self.refresh()
-                return
+                return True
             if self.current_plugin != PLUGIN:
                 self.task = self.services.commands.submit(
                     self.current_plugin, self.current_command, self.form.get_values()
@@ -957,13 +1148,16 @@ class Application:
                 self.refresh()
                 return
             if command == "swap":
-                self.json_tool.swap()
+                if self.result_artifact:
+                    self._load_json_input(self.result_artifact)
                 return
             if command == "clear":
                 self.json_tool.clear()
-                self.result_artifact = None
+                self._clear_json_result()
                 self.refresh()
                 return
+            if command in ("format", "minify", "import", "export"):
+                self.json_tool.clear_export_feedback()
             if command in ("copy", "export"):
                 arguments = {"artifact_id": self.result_artifact}
             else:
@@ -996,7 +1190,8 @@ class Application:
         self.background_token.cancel()
         if self.task:
             self.task.cancel()
-            self.progress.update_progress(0, self.t("Cancel"))
+            if self.active_action == "compress":
+                self.image_tool.batch_progress.update_progress(None, self.t("Cancel"))
 
     def confirm(self, message, callback):
         dialog = Dialog(
@@ -1035,9 +1230,8 @@ class Application:
             if not record or not record["enabled"]:
                 self.error(self.t("Enable Image Compressor to open image files."))
                 return
-            self.image_tool.set_files(map(str, selected))
             self.navigate("tool", IMAGE_PLUGIN)
-            self.request_image_preview()
+            self.run_command("import_images", [str(path) for path in selected])
         elif len(selected) == 1 and selected[0].suffix.casefold() == ".json":
             record = self.services.store.get(PLUGIN)
             if not record or not record["enabled"]:
@@ -1070,6 +1264,20 @@ class Application:
                 os.startfile(path)  # type: ignore[attr-defined]
             else:
                 subprocess.Popen(["xdg-open", path])
+        except OSError as exc:
+            self.error(str(exc))
+
+    def reveal_in_file_manager(self, path):
+        import subprocess
+
+        target = Path(path)
+        try:
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(target)])
+            elif sys.platform == "win32":
+                subprocess.Popen(["explorer.exe", "/select,", str(target)])
+            else:
+                subprocess.Popen(["xdg-open", str(target.parent)])
         except OSError as exc:
             self.error(str(exc))
 
@@ -1126,11 +1334,15 @@ class Application:
         self.theme_preference = preference
         mode = preferred_theme(self.root) if preference == "system" else preference
         self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
+        if preference == "system":
+            _follow_system_appearance(self.root)
         self.services.store.set_setting("host", "theme", preference)
 
     def _system_appearance_changed(self, mode):
-        if self.theme_preference == "system" and self.theme.mode != mode:
-            self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
+        if self.theme_preference == "system":
+            if self.theme.mode != mode:
+                self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
+            _follow_system_appearance(self.root)
 
     def change_language(self, event=None):
         preference = self.settings.language_preference()
@@ -1151,9 +1363,10 @@ class Application:
         self.theme.translator.configure(locale=self.locale)
         self.palette.destroy()
         self.app_frame.destroy()
-        self.progress.destroy()
         self._build(values, image_files)
         self.navigate(selected_page, selected_plugin)
+        # Finalize destroyed Tk variables on their owning thread after a rebuild.
+        gc.collect()
 
     def close(self):
         if self.closing:
@@ -1173,7 +1386,9 @@ class Application:
         for sequence, binding in self._key_bindings:
             self.root.unbind(sequence, binding)
         self.subscription.close()
-        self.services.artifacts.release("image-preview")
+        for entry in self.preview_cache.values():
+            self.services.artifacts.release(entry[0])
+        self.preview_cache.clear()
         self.platform.close()
         self.scheduler.close()
         for handle in reversed(self.extension_handles):
@@ -1181,9 +1396,9 @@ class Application:
         self.root.destroy()
         self.background_token.cancel()
 
-        def finish():
-            self.jobs.shutdown(wait=True, cancel_futures=True)
-            self.services.close()
+        def finish(jobs=self.jobs, services=self.services):
+            jobs.shutdown(wait=True, cancel_futures=True)
+            services.close()
 
         self._shutdown_thread = threading.Thread(target=finish, daemon=False)
         self._shutdown_thread.start()

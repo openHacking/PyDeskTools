@@ -19,9 +19,32 @@ from packaging.tags import parse_tag
 from packaging.utils import canonicalize_name, parse_wheel_filename
 from packaging.version import Version
 from pydesktools_sdk import CancellationToken, PluginError
+from pydesktools_sdk import __version__ as sdk_version
 from pydesktools_sdk.protocol import descriptor
 
 from .processes import WorkerProcess
+
+
+def platform_label(system=None, machine=None):
+    """Return the stable plugin-manifest label for a native desktop target."""
+    import platform
+
+    system = system or platform.system()
+    machine = machine or platform.machine()
+    operating_system = {
+        "Darwin": "macos",
+        "Windows": "windows",
+        "Linux": "linux",
+    }.get(system, "unsupported")
+    architecture = {
+        "AMD64": "x86_64",
+        "amd64": "x86_64",
+        "x86_64": "x86_64",
+        "arm64": "arm64",
+        "ARM64": "arm64",
+        "aarch64": "arm64",
+    }.get(machine, machine.lower())
+    return f"{operating_system}-{architecture}"
 
 MAX_BUNDLE = 200 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
@@ -112,7 +135,7 @@ def inspect_bundle(path):
         ):
             raise ValueError("Invalid capabilities")
         Version(manifest["version"])
-        if Version("0.1.0") not in SpecifierSet(manifest["requires_sdk"]):
+        if Version(sdk_version) not in SpecifierSet(manifest["requires_sdk"]):
             raise ValueError("SDK incompatible")
         lock = archive.read("requirements.lock").decode()
         pinned = {}
@@ -279,13 +302,7 @@ class Installer:
             raise ValueError("Bundle requires a compatible CPython 3.13 runtime")
         import platform
 
-        label = (
-            {"Darwin": "macos", "Linux": "linux"}.get(platform.system(), "unsupported")
-            + "-"
-            + {"arm64": "arm64", "aarch64": "arm64", "x86_64": "x86_64"}.get(
-                platform.machine(), platform.machine()
-            )
-        )
+        label = platform_label(platform.system(), platform.machine())
         if label not in manifest["platforms"]:
             raise ValueError("Bundle platform unsupported")
         tag_text = subprocess.check_output(

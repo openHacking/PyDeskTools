@@ -37,6 +37,7 @@ OUTPUT = {
         "truncated": {"type": "boolean"},
         "canceled": {"type": "boolean"},
         "path": {"type": ["string", "null"]},
+        "imported": {"type": "boolean"},
     },
     "additionalProperties": False,
 }
@@ -208,7 +209,7 @@ class JsonTools:
         else:
             raise PluginError("unknown_command", "Unknown JSON command")
         try:
-            output = transform(
+            output = text if command_id == "import" else transform(
                 text,
                 indent=arguments.get("indent", 2),
                 sort_keys=arguments.get("sort_keys", False),
@@ -231,6 +232,8 @@ class JsonTools:
         if truncated:
             preview += "\n\n" + self.t("Preview truncated; copy or export the complete result.")
         result = {"artifact_id": identifier, "bytes": len(payload), "truncated": truncated}
+        if command_id == "import":
+            result["imported"] = True
         if len(payload) <= INLINE:
             result["text"] = output
         context.report_progress(1.0, self.t("JSON result"))

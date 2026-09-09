@@ -59,7 +59,7 @@ class InvocationContext:
     task_id: str
     cancellation: CancellationToken
     host: Any
-    report_progress: Callable[[float | None, str], None]
+    report_progress: Callable[..., None]
 
 
 @dataclass(frozen=True)
