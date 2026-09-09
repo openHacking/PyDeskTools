@@ -34,7 +34,7 @@ jobs:
       matrix:
         include:
           - os: windows-2022
-            python: '3.14.6'
+            python: '3.14.7'
           - os: ubuntu-22.04
             python: '3.13'
     runs-on: ${{ matrix.os }}
@@ -46,7 +46,7 @@ jobs:
       - run: python -m pip install pytest -e packages/pydesktools-sdk -e packages/pydesktools-runtime
       - run: python -m pytest tests/test_platforms.py
       - if: runner.os == 'Windows'
-        run: python -c "import platform, tkinter; assert platform.machine() == 'AMD64'; assert tkinter.TkVersion >= 9"
+        run: python -c "import platform, tkinter; print(platform.python_version(), platform.machine(), 'Tk', tkinter.TkVersion); assert platform.machine() == 'AMD64'; assert tkinter.TkVersion >= 9"
 
   desktop-macos:
     runs-on: macos-14

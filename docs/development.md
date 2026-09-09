@@ -74,10 +74,11 @@ If installation fails before completion, later scripts can report missing module
 such as `packaging`; fix the original resolver error and rerun the full install.
 For example, PyDeskUI 0.2 cannot satisfy an old `pydeskui<0.2` application constraint.
 
-On Windows PowerShell, use a Python 3.14 installation that reports Tcl/Tk 9 and
-`.\.venv\Scripts\Activate.ps1`. Linux developers must provide Python 3.13+ linked
-against Tk 9; package names vary by distribution. Published desktop installers
-contain both the GUI and plugin runtimes, so end users do not perform this setup.
+On Windows PowerShell, use Python 3.14.7 or newer that reports Tcl/Tk 9 and
+`.\.venv\Scripts\Activate.ps1`. Earlier official Python 3.14 Windows releases are
+linked to Tk 8.6. Linux developers must provide Python 3.13+ linked against Tk 9;
+package names vary by distribution. Published desktop installers contain both the
+GUI and plugin runtimes, so end users do not perform this setup.
 
 ## Verification
 

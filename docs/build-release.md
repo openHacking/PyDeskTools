@@ -9,7 +9,7 @@ separate CPython 3.13.7 runtimes pinned in `runtime-sources.json`.
 | Target | Native builder | Output |
 | --- | --- | --- |
 | `macos-arm64` | macOS 14 arm64, Homebrew Python 3.13 + Tk 9 | Developer ID-signed DMG (not notarized) |
-| `windows-x86_64` | Windows 2022, official Python 3.14 + Tk 9 | unsigned Inno Setup beta |
+| `windows-x86_64` | Windows 2022, official Python 3.14.7 + Tk 9 | unsigned Inno Setup beta |
 | `linux-x86_64` | Ubuntu 22.04, source-built Python 3.14 + Tk 9 | AppImage for X11/XWayland |
 
 Every builder fails if its operating system, architecture, Python, or Tk version is
