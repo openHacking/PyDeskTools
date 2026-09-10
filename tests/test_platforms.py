@@ -2,8 +2,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from pydesktools_runtime.plugins import platform_label, venv_python
 from pydesktools_runtime.processes import terminate_process
+from pydesktools_runtime.storage import Store
 
 
 def test_platform_labels():
@@ -35,3 +37,15 @@ def test_child_process_termination_uses_native_process_model():
         if process.poll() is None:
             process.kill()
             process.wait()
+
+
+def test_profile_lock_uses_native_process_model(tmp_path):
+    first = Store(tmp_path / "profile")
+    try:
+        with pytest.raises(RuntimeError, match="already open"):
+            Store(first.root)
+    finally:
+        first.close()
+
+    reopened = Store(first.root)
+    reopened.close()

@@ -11,22 +11,41 @@ from pathlib import Path
 from pydesktools_sdk import PluginError
 
 
+def lock_profile(lockfile):
+    """Acquire a non-blocking, process-scoped lock on the profile."""
+    try:
+        if os.name == "posix":
+            import fcntl
+
+            fcntl.flock(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif os.name == "nt":
+            import msvcrt
+
+            if os.fstat(lockfile.fileno()).st_size == 0:
+                lockfile.write(b"\0")
+                lockfile.flush()
+            lockfile.seek(0)
+            msvcrt.locking(  # type: ignore[attr-defined]
+                lockfile.fileno(),
+                msvcrt.LK_NBLCK,  # type: ignore[attr-defined]
+                1,
+            )
+        else:
+            raise RuntimeError("Unsupported process ownership platform")
+    except OSError:
+        raise RuntimeError("This application profile is already open") from None
+
+
 class Store:
     def __init__(self, root):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.lockfile = (self.root / "profile.lock").open("a+b")
-        if os.name == "posix":
-            import fcntl
-
-            try:
-                fcntl.flock(self.lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                self.lockfile.close()
-                raise RuntimeError("This application profile is already open") from None
-        else:
+        try:
+            lock_profile(self.lockfile)
+        except Exception:
             self.lockfile.close()
-            raise RuntimeError("This release supports POSIX process ownership only")
+            raise
         self.lock = threading.RLock()
         self.db = sqlite3.connect(self.root / "state.sqlite3", check_same_thread=False)
         self.db.execute("PRAGMA foreign_keys=ON")
