@@ -910,6 +910,7 @@ class Application:
             try:
                 callback()
             except Exception as exc:
+                self.services.logger.exception("Background operation failed")
                 error = str(exc)
             self.events.put({"type": "background", "error": error})
 
@@ -960,6 +961,9 @@ class Application:
                             consent=True,
                             official=True,
                             token=self.background_token,
+                            progress=lambda phase, plugin=identifier: self.services.logger.info(
+                                "Provisioning %s: %s", plugin, phase
+                            ),
                         )
                         break
                     except Exception as exc:

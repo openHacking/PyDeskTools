@@ -8,7 +8,9 @@ work="$(pwd)/build/linux-gui-sources"
 mkdir -p "$work" "$prefix"
 
 if [[ -x "$prefix/bin/python3.14" ]] && \
-  "$prefix/bin/python3.14" -c 'import tkinter; assert tkinter.TkVersion >= 9' 2>/dev/null; then
+  "$prefix/bin/python3.14" -c \
+    'import sysconfig, tkinter; assert tkinter.TkVersion >= 9; assert sysconfig.get_config_var("Py_ENABLE_SHARED") == 1' \
+    2>/dev/null; then
   exit 0
 fi
 
@@ -52,10 +54,11 @@ tar -xzf "$work/Python-${python_version}.tgz" -C "$work"
   cd "$work/Python-${python_version}"
   export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
   export LD_LIBRARY_PATH="$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  LDFLAGS="-Wl,-rpath,$prefix/lib" ./configure --prefix="$prefix" --with-ensurepip=install
+  LDFLAGS="-Wl,-rpath,$prefix/lib" ./configure \
+    --prefix="$prefix" --enable-shared --with-ensurepip=install
   make -j"$(nproc)"
   make install
 )
 
 "$prefix/bin/python3.14" -c \
-  'import platform, tkinter; assert platform.machine() == "x86_64"; assert tkinter.TkVersion >= 9; print(platform.python_version(), tkinter.TkVersion)'
+  'import platform, sysconfig, tkinter; assert platform.machine() == "x86_64"; assert tkinter.TkVersion >= 9; assert sysconfig.get_config_var("Py_ENABLE_SHARED") == 1; print(platform.python_version(), tkinter.TkVersion)'

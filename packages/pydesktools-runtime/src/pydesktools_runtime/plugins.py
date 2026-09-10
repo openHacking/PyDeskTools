@@ -345,12 +345,13 @@ class Installer:
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     with archive.open(info) as source, destination.open("xb") as target:
                         shutil.copyfileobj(source, target)
-            progress("dependencies")
             self.store.execute(
                 "UPDATE journal SET phase=? WHERE path=?", ("dependencies", str(slot))
             )
+            progress("venv")
             self._run([str(self.python), "-I", "-m", "venv", str(slot / "venv")], token)
             python = venv_python(slot / "venv")
+            progress("dependencies")
             self._run(
                 [
                     str(python),
@@ -370,6 +371,7 @@ class Installer:
                 ],
                 token,
             )
+            progress("dependency_check")
             self._run([str(python), "-I", "-m", "pip", "--isolated", "check"], token)
             progress("health_check")
             self.store.execute(

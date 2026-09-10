@@ -125,6 +125,7 @@ jobs:
           $appProcess = Start-Process (Join-Path $install 'PyDeskTools.exe') -ArgumentList '--data-dir',("`"$profile`""),'--verify-installation',("`"$report`"") -PassThru
           if (-not $appProcess.WaitForExit(300000)) {
             Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            if (Test-Path $report) { Get-Content $report }
             $diagnostics = Join-Path $profile 'logs/diagnostics.log'
             if (Test-Path $diagnostics) { Get-Content $diagnostics }
             throw 'application diagnostic timed out after 5 minutes'
@@ -163,7 +164,7 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: build/linux-gui
-          key: linux-gui-python-3.14.6-tk-9.0.4-v1
+          key: linux-gui-python-3.14.6-tk-9.0.4-shared-v2
       - run: bash scripts/bootstrap_linux_gui_python.sh "$PWD/build/linux-gui"
       - run: |
           build/linux-gui/bin/python3.14 -m venv .venv

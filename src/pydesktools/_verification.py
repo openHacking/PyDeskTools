@@ -1,5 +1,6 @@
 """Opt-in packaged installation diagnostic, using a disposable profile."""
 
+import json
 import sys
 import threading
 import time
@@ -11,12 +12,19 @@ IMAGE_PLUGIN = "org.pydesk.image-compressor"
 
 
 def start(app, destination, started):
+    destination.write_text(
+        json.dumps({"passed": False, "stage": "waiting_for_default_plugins"}, indent=2) + "\n"
+    )
+
     def ready():
         if app.background_busy:
             app.scheduler.call_later(50, ready)
             return
 
         gui_tk_version = str(app.root.tk.call("package", "provide", "Tk"))
+        destination.write_text(
+            json.dumps({"passed": False, "stage": "running_diagnostic"}, indent=2) + "\n"
+        )
 
         def verify():
             report = {
