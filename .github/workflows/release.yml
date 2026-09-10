@@ -122,7 +122,13 @@ jobs:
           $installer = (Get-Item 'dist/PyDeskTools-*-windows-x64-unsigned.exe').FullName
           $installProcess = Start-Process $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',("/DIR=`"$install`"") -Wait -PassThru
           if ($installProcess.ExitCode -ne 0) { throw "installer exited with $($installProcess.ExitCode)" }
-          $appProcess = Start-Process (Join-Path $install 'PyDeskTools.exe') -ArgumentList '--data-dir',("`"$profile`""),'--verify-installation',("`"$report`"") -Wait -PassThru
+          $appProcess = Start-Process (Join-Path $install 'PyDeskTools.exe') -ArgumentList '--data-dir',("`"$profile`""),'--verify-installation',("`"$report`"") -PassThru
+          if (-not $appProcess.WaitForExit(300000)) {
+            Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            $diagnostics = Join-Path $profile 'logs/diagnostics.log'
+            if (Test-Path $diagnostics) { Get-Content $diagnostics }
+            throw 'application diagnostic timed out after 5 minutes'
+          }
           if ($appProcess.ExitCode -ne 0) { throw "application diagnostic exited with $($appProcess.ExitCode)" }
           if (-not (Test-Path $report)) { throw 'verification report missing' }
           $result = Get-Content $report | ConvertFrom-Json

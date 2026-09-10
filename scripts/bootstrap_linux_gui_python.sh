@@ -35,6 +35,9 @@ tar -xzf "$work/Python-${python_version}.tgz" -C "$work"
 
 (
   cd "$work/tcl${tk_version}/unix"
+  # Tcl 9.0.4 builds bundled packages with the just-built tclsh before
+  # libtcl is installed, so make that build-tree library discoverable.
+  export LD_LIBRARY_PATH="$PWD${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   ./configure --prefix="$prefix" --enable-threads --enable-64bit
   make -j"$(nproc)"
   make install

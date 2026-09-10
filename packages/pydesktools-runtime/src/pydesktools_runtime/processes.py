@@ -14,6 +14,18 @@ from pydesktools_sdk import PluginError
 from pydesktools_sdk.protocol import encode, read, validate_progress_data
 
 
+def terminate_process(process, *, force=False):
+    """Stop a child process using the native process model."""
+    if os.name == "nt":
+        if process.poll() is None:
+            (process.kill if force else process.terminate)()
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+
 class WorkerProcess:
     def __init__(self, python, manifest, root, locale, host_call, on_progress):
         self.session = uuid.uuid4().hex
@@ -268,17 +280,11 @@ class WorkerProcess:
         except subprocess.TimeoutExpired:
             pass
         # Reap the process group even if the worker itself has already exited.
-        try:
-            os.killpg(self.process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+        terminate_process(self.process)
         try:
             self.process.wait(timeout=1)
         except subprocess.TimeoutExpired:
-            os.killpg(self.process.pid, signal.SIGKILL)
+            terminate_process(self.process, force=True)
             self.process.wait(timeout=1)
-        try:
-            os.killpg(self.process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+        terminate_process(self.process, force=True)
         self._fail(RuntimeError("Worker stopped"))

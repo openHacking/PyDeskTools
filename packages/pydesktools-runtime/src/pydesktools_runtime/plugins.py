@@ -22,7 +22,7 @@ from pydesktools_sdk import CancellationToken, PluginError
 from pydesktools_sdk import __version__ as sdk_version
 from pydesktools_sdk.protocol import descriptor
 
-from .processes import WorkerProcess
+from .processes import WorkerProcess, terminate_process
 
 
 def platform_label(system=None, machine=None):
@@ -53,6 +53,7 @@ def venv_python(venv, system=None):
 
     system = system or platform.system()
     return Path(venv) / ("Scripts/python.exe" if system == "Windows" else "bin/python")
+
 
 MAX_BUNDLE = 200 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
@@ -254,7 +255,6 @@ class Installer:
             self.store.execute("DELETE FROM journal WHERE path=?", (path,))
 
     def _run(self, args, token, timeout=120):
-        import signal
         import time
 
         env = {
@@ -277,11 +277,11 @@ class Installer:
                     raise RuntimeError("Offline dependency preparation failed")
             finally:
                 if process.poll() is None:
-                    os.killpg(process.pid, signal.SIGTERM)
+                    terminate_process(process)
                     try:
                         process.wait(timeout=1)
                     except subprocess.TimeoutExpired:
-                        os.killpg(process.pid, signal.SIGKILL)
+                        terminate_process(process, force=True)
                         process.wait()
 
     def install(

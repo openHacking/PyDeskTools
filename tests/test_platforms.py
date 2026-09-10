@@ -1,6 +1,9 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from pydesktools_runtime.plugins import platform_label, venv_python
+from pydesktools_runtime.processes import terminate_process
 
 
 def test_platform_labels():
@@ -19,3 +22,16 @@ def test_venv_python_uses_native_layout():
     assert venv_python(root, "Windows") == root / "Scripts/python.exe"
     assert venv_python(root, "Darwin") == root / "bin/python"
     assert venv_python(root, "Linux") == root / "bin/python"
+
+
+def test_child_process_termination_uses_native_process_model():
+    process = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
+    )
+    try:
+        terminate_process(process, force=True)
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
