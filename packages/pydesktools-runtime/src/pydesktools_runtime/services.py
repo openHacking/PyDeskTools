@@ -18,7 +18,7 @@ from platformdirs import user_data_path
 from pydesktools_sdk import CancellationToken, PluginError
 from pydesktools_sdk.protocol import descriptor, validate, validate_view
 
-from .plugins import Installer
+from .plugins import Installer, venv_python
 from .processes import WorkerProcess
 from .storage import Artifacts, Store
 
@@ -158,7 +158,7 @@ class ServiceContainer:
                         raise PluginError("busy", "All worker slots are busy", code=-32004)
                     self._stop_worker(idle[0])
             worker = WorkerProcess(
-                Path(record["path"]) / "venv/bin/python",
+                venv_python(Path(record["path"]) / "venv"),
                 record["manifest"],
                 self.store.root / "plugin-data" / plugin,
                 self.locale,

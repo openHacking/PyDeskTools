@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from pydesktools_runtime import RuntimeConfig, create_services
-from pydesktools_runtime.plugins import inspect_bundle
+from pydesktools_runtime.plugins import inspect_bundle, venv_python
 from pydesktools_sdk.protocol import read
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,7 +108,9 @@ def test_offline_lifecycle(services):
     worker = services._workers[PLUGIN]
     assert worker.process.pid != os.getpid()
     assert ("pydesk_json_tools" in sys.modules) == plugin_previously_imported
-    assert "venv/bin/python" in worker.process.args[0]
+    assert Path(worker.process.args[0]) == venv_python(
+        Path(services.store.get(PLUGIN)["path"]) / "venv"
+    )
     services.disable(PLUGIN)
     assert worker.process.poll() is not None
     assert not services.store.get(PLUGIN)["enabled"]
