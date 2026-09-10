@@ -62,7 +62,8 @@ jobs:
           "$(brew --prefix python@3.13)/bin/python3.13" -m venv .venv
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: python -m pip install -e vendor/PyDeskUI -e packages/pydesktools-sdk -e packages/pydesktools-runtime -e plugins/json-tools -e plugins/image-compressor -e '.[dev]'
-      - run: python scripts/build_bundles.py --target macos-arm64
+      - run: python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
+      - run: python scripts/build_bundles.py --target macos-arm64 --runtime-source build/plugin-runtime/macos-arm64/python
       - run: ruff check src packages plugins scripts tests
       - run: mypy
       - run: python -m pytest

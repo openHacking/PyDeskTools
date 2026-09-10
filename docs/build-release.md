@@ -21,7 +21,8 @@ Fetch a verified worker runtime and build bundles with:
 
 ```sh
 python scripts/fetch_runtime.py --target TARGET --output build/plugin-runtime/TARGET
-python scripts/build_bundles.py --target TARGET
+python scripts/build_bundles.py --target TARGET \
+  --runtime-source build/plugin-runtime/TARGET/python
 ```
 
 ### macOS

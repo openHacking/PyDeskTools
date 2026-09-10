@@ -1,4 +1,4 @@
-"""Build complete CPython 3.13 macOS arm64 offline first-party bundles."""
+"""Build native offline first-party bundles for the pinned CPython 3.13 worker."""
 
 import argparse
 import hashlib
@@ -9,8 +9,8 @@ import sys
 import zipfile
 from pathlib import Path
 
-from build_support import verify_builder
-from packaging.tags import sys_tags
+from build_support import verify_builder, verify_runtime
+from packaging.tags import parse_tag
 from packaging.utils import parse_wheel_filename
 from packaging.version import Version
 
@@ -32,8 +32,18 @@ def main():
         default="macos-arm64",
         help="Platform label embedded in the first-party plugin manifests",
     )
+    parser.add_argument(
+        "--runtime-source",
+        type=Path,
+        help="Extracted pinned plugin runtime; defaults to build/plugin-runtime/TARGET/python",
+    )
     args = parser.parse_args()
     verify_builder(args.target)
+    runtime_source = (
+        args.runtime_source or ROOT / "build/plugin-runtime" / args.target / "python"
+    )
+    runtime, _, runtime_entry = verify_runtime(runtime_source, args.target)
+    runtime_python = runtime / runtime_entry["executable"]
     wheels = ROOT / "build/wheelhouse" / args.target
     wheels.mkdir(parents=True, exist_ok=True)
     if not args.offline:
@@ -58,10 +68,13 @@ def main():
         )
     if not args.offline:
         run(
-            sys.executable,
+            runtime_python,
+            "-I",
             "-m",
             "pip",
+            "--isolated",
             "download",
+            "--disable-pip-version-check",
             "--only-binary=:all:",
             "--no-deps",
             "--dest",
@@ -105,7 +118,16 @@ capabilities = ["dialogs.open_files"]
             "pillow",
         ),
     }
-    compatible_tags = set(sys_tags())
+    tag_text = subprocess.check_output(
+        [
+            str(runtime_python),
+            "-I",
+            "-c",
+            "from pip._vendor.packaging.tags import sys_tags; print(chr(10).join(map(str, sys_tags())))",
+        ],
+        text=True,
+    )
+    compatible_tags = set().union(*(parse_tag(line) for line in tag_text.splitlines()))
     available: dict[str, tuple[Version, Path]] = {}
     for wheel in wheels.glob("*.whl"):
         name, version, _, tags = parse_wheel_filename(wheel.name)

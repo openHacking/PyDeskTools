@@ -46,6 +46,14 @@ def platform_label(system=None, machine=None):
     }.get(machine, machine.lower())
     return f"{operating_system}-{architecture}"
 
+
+def venv_python(venv, system=None):
+    """Return the native interpreter path created by ``python -m venv``."""
+    import platform
+
+    system = system or platform.system()
+    return Path(venv) / ("Scripts/python.exe" if system == "Windows" else "bin/python")
+
 MAX_BUNDLE = 200 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
 
@@ -342,7 +350,7 @@ class Installer:
                 "UPDATE journal SET phase=? WHERE path=?", ("dependencies", str(slot))
             )
             self._run([str(self.python), "-I", "-m", "venv", str(slot / "venv")], token)
-            python = slot / "venv/bin/python"
+            python = venv_python(slot / "venv")
             self._run(
                 [
                     str(python),

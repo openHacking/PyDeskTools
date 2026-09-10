@@ -38,7 +38,9 @@ python -m pip install -e ../PyDeskUI \
   -e plugins/json-tools \
   -e plugins/image-compressor \
   -e '.[dev]'
-python scripts/build_bundles.py
+python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
+python scripts/build_bundles.py --target macos-arm64 \
+  --runtime-source build/plugin-runtime/macos-arm64/python
 python -m pydesktools
 ```
 
@@ -97,5 +99,7 @@ environments provisioned by the application. Rebuild the offline bundles after
 changing SDK or plugin sources:
 
 ```sh
-python scripts/build_bundles.py
+python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
+python scripts/build_bundles.py --target macos-arm64 \
+  --runtime-source build/plugin-runtime/macos-arm64/python
 ```
