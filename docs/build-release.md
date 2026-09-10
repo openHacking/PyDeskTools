@@ -80,15 +80,193 @@ and XWayland are supported for 0.1.0; native Wayland behavior is not certified.
 
 ## Draft release workflow
 
-1. Run normal CI and review the release diff.
-2. Update the changelog and release notes, then create and push the annotated `v0.1.0` tag.
-3. Manually run **Draft desktop release** with that existing tag.
-4. The workflow validates versions, builds all three native artifacts in parallel,
-   performs frozen-install diagnostics, and creates attestations.
-5. Only after all jobs succeed does the final job create one Draft Pre-release with
-   all artifacts, build manifests, and `SHA256SUMS.txt`.
-6. Download and inspect the draft assets, then publish it manually. Enable immutable
-   releases first so the published tag and assets cannot be replaced.
+The public installers are rebuilt by GitHub Actions from an existing annotated tag.
+Do not upload a locally built DMG as a release artifact, and do not create the tag
+until the exact release commit has passed CI. The workflow creates a Draft
+Pre-release; publishing it is deliberately a separate manual decision.
+
+The examples below use `v0.1.0`. Replace it consistently when preparing a later
+version. Run all commands from the repository root.
+
+### 1. Prepare and validate the release commit
+
+Start from a clean checkout synchronized with `origin/main`:
+
+```sh
+git fetch origin --tags
+git status --short --branch
+test -z "$(git status --porcelain)"
+test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+```
+
+Review the changes intended for the release. Update `CHANGELOG.md` and the matching
+release-notes file, and make sure neither describes the version as unreleased. The
+release workflow currently reads `docs/release-notes-v0.1.0.md`; a future release
+must update both that path in `.github/workflows/release.yml` and the file itself.
+
+Run the same fail-closed version check used by the release workflow:
+
+```sh
+python scripts/validate_release.py --tag v0.1.0
+```
+
+This checks the application version, component versions, changelog heading, and
+plugin-runtime target matrix. Commit and push any corrections before continuing.
+
+### 2. Run the full CI workflow
+
+`CI` is a manual `workflow_dispatch` workflow. Trigger it on the exact branch and
+commit that will receive the release tag:
+
+```sh
+gh workflow run ci.yml --ref main
+gh run list --workflow ci.yml --branch main --event workflow_dispatch --limit 5
+```
+
+Open the newest run in GitHub Actions, or copy its numeric database ID from the list
+and wait for it from the command line:
+
+```sh
+gh run watch RUN_ID --exit-status
+gh run view RUN_ID --json headSha,conclusion,url
+```
+
+Do not continue unless every CI job succeeds. CI covers the supported headless Python
+versions, Windows and Linux platform contracts, the macOS desktop suite, linting,
+type checking, and Python distribution builds. Confirm that `headSha` is the commit
+you intend to tag. If a fix is needed, push it and run CI again; the later tag must
+point at the corrected commit.
+
+### 3. Create and push the annotated tag
+
+After CI is green, confirm `HEAD` is still the tested commit, then create an annotated
+tag and push only that tag:
+
+```sh
+git status --short --branch
+git tag -a v0.1.0 -m "PyDeskTools v0.1.0"
+git show --no-patch --decorate v0.1.0
+git push origin v0.1.0
+git ls-remote --exit-code --tags origin refs/tags/v0.1.0
+```
+
+Do not move, force-push, or silently recreate a published version tag. If the tag is
+wrong and no release has been published, stop and resolve it explicitly before
+running the release workflow.
+
+### 4. Build the Draft Pre-release
+
+Trigger **Draft desktop release** with the tag that now exists on GitHub:
+
+```sh
+gh workflow run release.yml -f tag=v0.1.0
+gh run list --workflow release.yml --event workflow_dispatch --limit 5
+```
+
+Alternatively, open **Actions > Draft desktop release > Run workflow**, enter
+`v0.1.0`, and start the run. Copy the new run ID and wait for completion if desired:
+
+```sh
+gh run watch RUN_ID --exit-status
+```
+
+The workflow first checks out the tag and validates all release versions. It then
+builds the three native targets in parallel, performs frozen-install diagnostics,
+and creates GitHub artifact attestations. Only after all three jobs succeed does the
+final job create one Draft Pre-release containing:
+
+- `PyDeskTools-*-macos-arm64.dmg`
+- `PyDeskTools-*-windows-x64-unsigned.exe`
+- `PyDeskTools-*-linux-x86_64.AppImage`
+- one `build-manifest-*.json` for each platform
+- `SHA256SUMS.txt`
+
+Intermediate Actions artifacts are retained for only one day. The Draft Release is
+the durable review location. A failed platform job does not create a partial release;
+if the failure is transient, rerun the unchanged tag. If correcting it requires a
+source commit, stop: the existing tag no longer identifies the candidate you tested.
+Explicitly resolve the unpublished tag and repeat CI/tagging, or bump the version,
+rather than publishing incomplete assets or quietly moving a release tag.
+
+### 5. Inspect the Draft and its final assets
+
+Open **Releases**, find the `PyDeskTools 0.1.0` draft, and first check its title,
+Pre-release flag, notes, tag, and complete asset list. Download the assets generated
+by CI rather than inspecting a local build:
+
+```sh
+release_dir="$(mktemp -d)"
+gh release download v0.1.0 --dir "$release_dir"
+cd "$release_dir"
+shasum -a 256 --check SHA256SUMS.txt
+```
+
+Inspect the three JSON manifests and verify the application version, target, builder
+Python version, embedded runtime metadata and hashes, and each platform's applicable
+signing/notarization fields. Verify the provenance attestation for each installer:
+
+```sh
+for artifact in PyDeskTools-*; do
+  gh attestation verify "$artifact" --repo openHacking/PyDeskTools
+done
+```
+
+Test the downloaded final installer on each platform claimed by the release whenever
+possible, preferably with a clean machine or VM and an empty disposable profile.
+Confirm installation or mounting, launch, the packaged diagnostic, process cleanup,
+and uninstall/eject behavior. The automated jobs already exercise these paths, but
+manual review catches packaging and first-launch behavior that runner diagnostics do
+not reproduce.
+
+The expected warnings are part of this beta release and must remain disclosed in the
+release notes:
+
+- The macOS DMG is Developer ID-signed but not notarized. Verify that the downloaded
+  app has a valid Developer ID signature; first launch may require **Open Anyway** in
+  Privacy & Security.
+- The Windows installer is unsigned and may trigger SmartScreen. Its filename must
+  retain `unsigned`.
+- The Linux AppImage is certified for X11/XWayland on the documented compatibility
+  floor, not native Wayland.
+
+Do not publish if a checksum, attestation, manifest, signature, installation, launch,
+or uninstall check fails. Do not replace a failed asset manually: correct the source
+or workflow and produce a new coherent release candidate.
+
+### 6. Enable immutable releases and publish
+
+Before publishing the draft, open the repository **Settings**, scroll to the
+**Releases** section, and select **Enable release immutability**. GitHub applies this
+setting only to future published releases, so it must be enabled before clicking
+Publish. See GitHub's [immutable release instructions](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes).
+
+Return to the Draft Release and perform one final review. Keep **Set as a pre-release**
+enabled for this experimental `0.1.0` release, then click **Publish release**. Once an
+immutable release is published, its assets and associated tag cannot be modified or
+deleted while the release exists; only metadata such as the title, notes, Pre-release
+flag, and Latest flag remains editable.
+
+Confirm the result:
+
+```sh
+gh release view v0.1.0 --json tagName,isDraft,isPrerelease,isImmutable,publishedAt,url
+gh release verify v0.1.0
+```
+
+The expected state is `isDraft: false`, `isPrerelease: true`, and
+`isImmutable: true`. Announce or link the release only after these checks pass.
+
+### Stop conditions
+
+Stop the release instead of working around any of these conditions:
+
+- the working tree is dirty or `HEAD` differs from the reviewed remote commit;
+- `validate_release.py` or any CI/release job fails;
+- the remote tag is missing or points at an untested commit;
+- any platform artifact, manifest, checksum, or attestation is missing;
+- Apple signing fails, or an artifact's observed security state contradicts its
+  release-note disclosure;
+- immutable releases are not enabled before publication.
 
 The macOS job requires these repository secrets:
 
