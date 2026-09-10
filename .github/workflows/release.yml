@@ -122,8 +122,17 @@ jobs:
           $installer = (Get-Item 'dist/PyDeskTools-*-windows-x64-unsigned.exe').FullName
           $installProcess = Start-Process $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',("/DIR=`"$install`"") -Wait -PassThru
           if ($installProcess.ExitCode -ne 0) { throw "installer exited with $($installProcess.ExitCode)" }
-          $appProcess = Start-Process (Join-Path $install 'PyDeskTools.exe') -ArgumentList '--data-dir',("`"$profile`""),'--verify-installation',("`"$report`"") -PassThru
+          $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+          $startInfo.FileName = Join-Path $install 'PyDeskTools.exe'
+          $startInfo.UseShellExecute = $false
+          $startInfo.ArgumentList.Add('--data-dir')
+          $startInfo.ArgumentList.Add($profile)
+          $startInfo.ArgumentList.Add('--verify-installation')
+          $startInfo.ArgumentList.Add($report)
+          $appProcess = [System.Diagnostics.Process]::Start($startInfo)
           if (-not $appProcess.WaitForExit(300000)) {
+            Get-CimInstance Win32_Process -Filter "ProcessId = $($appProcess.Id)" |
+              Select-Object ProcessId, ParentProcessId, CommandLine | Format-List
             Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
             if (Test-Path $report) { Get-Content $report }
             $diagnostics = Join-Path $profile 'logs/diagnostics.log'

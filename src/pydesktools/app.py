@@ -1429,6 +1429,10 @@ def main():
     args = parser.parse_args()
     if args.verify_installation and not args.data_dir:
         parser.error("--verify-installation requires a disposable --data-dir")
+    if args.verify_installation:
+        args.verify_installation.write_text(
+            json.dumps({"passed": False, "stage": "launching_application"}, indent=2) + "\n"
+        )
     import time
 
     started = time.monotonic()
