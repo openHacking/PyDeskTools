@@ -395,6 +395,16 @@ def test_image_compressor_app_flow(tmp_path, monkeypatch):
         assert app.image_tool.buttons["compress"].instate(("disabled",))
         assert app.image_tool.buttons["compress"].cget("text") == "Completed"
         assert app.image_tool.queue_count.cget("text") == "0 Pending · 1 images selected"
+        opened = []
+        with monkeypatch.context() as patch:
+            patch.setattr("subprocess.Popen", lambda arguments: opened.append(arguments))
+            app.image_tool.open_output.invoke()
+        if sys.platform == "darwin":
+            assert opened == [["open", str(tmp_path)]]
+        elif sys.platform == "win32":
+            assert opened == [["explorer.exe", str(tmp_path)]]
+        else:
+            assert opened == [["xdg-open", str(tmp_path)]]
         outputs = list(tmp_path.glob("sample-compressed*.jpg"))
         assert app.run_command("compress") is False
         assert list(tmp_path.glob("sample-compressed*.jpg")) == outputs

@@ -11,6 +11,10 @@ from pathlib import Path
 from pydesktools_sdk import PluginError
 
 
+class ProfileInUseError(RuntimeError):
+    """Raised when another application instance owns a profile."""
+
+
 def lock_profile(lockfile):
     """Acquire a non-blocking, process-scoped lock on the profile."""
     try:
@@ -33,7 +37,7 @@ def lock_profile(lockfile):
         else:
             raise RuntimeError("Unsupported process ownership platform")
     except OSError:
-        raise RuntimeError("This application profile is already open") from None
+        raise ProfileInUseError("This application profile is already open") from None
 
 
 class Store:

@@ -1,12 +1,17 @@
+import hashlib
 import json
 import re
+import shutil
+import sys
 from pathlib import Path
 
 import pytest
 from pydesktools_runtime.plugins import inspect_bundle
+from pydesktools_runtime.storage import ProfileInUseError
 
 from pydesktools import __version__
-from pydesktools.app import packaged_runtime_path
+from pydesktools import app as application_module
+from pydesktools.app import ApplicationConfig, packaged_runtime_path, runtime_python
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,3 +63,41 @@ def test_packaged_runtime_locations(tmp_path):
     bundle = tmp_path / "bundle"
     (bundle / "plugin-runtime").mkdir(parents=True)
     assert packaged_runtime_path(tmp_path / "elsewhere/PyDeskTools", bundle) == bundle / "plugin-runtime"
+
+
+def test_packaged_runtime_accepts_another_process_winning_publish_race(tmp_path, monkeypatch):
+    application = tmp_path / "application"
+    resource = application / "plugin-runtime"
+    resource.mkdir(parents=True)
+    executable = resource / "python.exe"
+    executable.write_bytes(b"python")
+    manifest = {
+        "executable": "python.exe",
+        "files": {"python.exe": hashlib.sha256(b"python").hexdigest()},
+    }
+    (resource / "runtime.json").write_text(json.dumps(manifest))
+    profile = tmp_path / "profile"
+    real_copytree = shutil.copytree
+
+    def copytree_with_competing_winner(source, destination, **kwargs):
+        result = real_copytree(source, destination, **kwargs)
+        runtime_id = hashlib.sha256((resource / "runtime.json").read_bytes()).hexdigest()[:20]
+        winner = profile / "runtimes" / runtime_id
+        real_copytree(source, winner, symlinks=True)
+        return result
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(application / "PyDeskTools.exe"))
+    monkeypatch.setattr(shutil, "copytree", copytree_with_competing_winner)
+
+    assert runtime_python(ApplicationConfig(data_dir=profile)).read_bytes() == b"python"
+
+
+def test_main_treats_an_open_profile_as_an_existing_instance(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["pydesktools"])
+
+    def already_running(config):
+        raise ProfileInUseError("This application profile is already open")
+
+    monkeypatch.setattr(application_module, "create_application", already_running)
+    assert application_module.main() == 0

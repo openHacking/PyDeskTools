@@ -19,7 +19,12 @@ from tkinter import filedialog
 from tkinter import font as tkfont
 from typing import Any, Protocol
 
-from pydesktools_runtime import CloseHandle, RuntimeConfig, create_services
+from pydesktools_runtime import (
+    CloseHandle,
+    ProfileInUseError,
+    RuntimeConfig,
+    create_services,
+)
 from pydesktools_sdk import CancellationToken
 from pydeskui import (
     CommandPalette,
@@ -248,7 +253,12 @@ def runtime_python(config):
             try:
                 shutil.copytree(resource, candidate, symlinks=True)
                 verify(candidate)
-                candidate.rename(destination)
+                try:
+                    candidate.rename(destination)
+                except FileExistsError:
+                    # Another instance atomically published the same verified runtime.
+                    # Its completed directory is safe to share.
+                    pass
             finally:
                 if candidate.exists():
                     shutil.rmtree(candidate)
@@ -284,12 +294,17 @@ class Application:
         self.root.geometry("1280x840")
         self.root.minsize(1100, 720)
         self.platform = PlatformAdapter(self.root)
-        self.services = create_services(
-            RuntimeConfig(
-                config.app_id, config.data_namespace, config.data_dir, runtime_python(config)
-            ),
-            platform_adapter=self.platform,
-        )
+        try:
+            self.services = create_services(
+                RuntimeConfig(
+                    config.app_id, config.data_namespace, config.data_dir, config.python
+                ),
+                platform_adapter=self.platform,
+                python_resolver=lambda: runtime_python(config),
+            )
+        except BaseException:
+            self.root.destroy()
+            raise
         self.services.views = ViewRegistry()
         self.extension_handles = [
             extension.register(self.services) for extension in config.extensions
@@ -470,6 +485,7 @@ class Application:
             on_command=self.run_command,
             on_preview=self.request_image_preview,
             on_discard=self.discard_image_paths,
+            on_open_directory=self.open_directory,
             on_state_change=self.refresh,
             on_drop=lambda paths: self.run_command("import_images", paths),
             dnd_available=self.dnd_available,
@@ -1257,17 +1273,19 @@ class Application:
         self.refresh()
 
     def open_data_directory(self):
-        import os
+        self.open_directory(self.services.store.root)
+
+    def open_directory(self, path):
         import subprocess
 
-        path = str(self.services.store.root)
+        target = str(Path(path))
         try:
             if sys.platform == "darwin":
-                subprocess.Popen(["open", path])
+                subprocess.Popen(["open", target])
             elif sys.platform == "win32":
-                os.startfile(path)  # type: ignore[attr-defined]
+                subprocess.Popen(["explorer.exe", target])
             else:
-                subprocess.Popen(["xdg-open", path])
+                subprocess.Popen(["xdg-open", target])
         except OSError as exc:
             self.error(str(exc))
 
@@ -1436,7 +1454,12 @@ def main():
     import time
 
     started = time.monotonic()
-    app = create_application(ApplicationConfig(data_dir=args.data_dir))
+    try:
+        app = create_application(ApplicationConfig(data_dir=args.data_dir))
+    except ProfileInUseError:
+        # A second desktop launch should defer to the instance that owns the profile,
+        # not surface PyInstaller's unhandled-exception dialog.
+        return 0
     if args.verify_installation:
         from ._verification import start
 

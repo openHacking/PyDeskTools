@@ -77,12 +77,17 @@ class Events:
 
 
 class ServiceContainer:
-    def __init__(self, config, *, platform_adapter=None):
+    def __init__(self, config, *, platform_adapter=None, python_resolver=None):
         self.config = config
         self.locale = config.locale
         self.store = Store(
             config.data_dir or user_data_path(config.data_namespace, appauthor=False)
         )
+        try:
+            python = python_resolver() if python_resolver else config.python or Path(sys.executable)
+        except BaseException:
+            self.store.close()
+            raise
         logs = self.store.root / "logs"
         logs.mkdir(exist_ok=True)
         self.logger = logging.getLogger("pydesktools." + uuid.uuid4().hex)
@@ -93,7 +98,7 @@ class ServiceContainer:
         self.logger.addHandler(handler)
         self.artifacts = Artifacts(self.store.root / "artifacts" / uuid.uuid4().hex)
         self.platform_adapter = platform_adapter
-        self.installer = Installer(self.store, config.python or Path(sys.executable), self.locale)
+        self.installer = Installer(self.store, python, self.locale)
         self.commands = self
         self.tasks = Events()
         self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="pydesk-service")
@@ -413,5 +418,9 @@ class ServiceContainer:
             self.logger.removeHandler(handler)
 
 
-def create_services(config=None, *, platform_adapter=None):
-    return ServiceContainer(config or RuntimeConfig(), platform_adapter=platform_adapter)
+def create_services(config=None, *, platform_adapter=None, python_resolver=None):
+    return ServiceContainer(
+        config or RuntimeConfig(),
+        platform_adapter=platform_adapter,
+        python_resolver=python_resolver,
+    )

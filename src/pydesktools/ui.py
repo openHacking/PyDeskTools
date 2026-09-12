@@ -673,6 +673,7 @@ class ImageCompressorView(PaddedSurface):
         on_command,
         on_preview,
         on_discard,
+        on_open_directory,
         on_state_change,
         on_drop,
         dnd_available,
@@ -682,6 +683,7 @@ class ImageCompressorView(PaddedSurface):
         self.t = translate
         self.on_preview = on_preview
         self.on_discard = on_discard
+        self.on_open_directory = on_open_directory
         self.on_state_change = on_state_change
         self.on_drop = on_drop
         self.dnd_available = dnd_available
@@ -1063,11 +1065,10 @@ class ImageCompressorView(PaddedSurface):
         self.on_state_change()
 
     def _open_output(self):
-        import webbrowser
         selected = self.file_results.get(self.selected_path or "", {}).get("output")
         directories = [Path(selected).parent] if selected else self.output_directories
         for directory in directories:
-            webbrowser.open(directory.as_uri())
+            self.on_open_directory(directory)
 
     def _select(self, master, title, key, values):
         Label(master, text=self.t(title), theme=self.theme).pack(anchor="w", pady=(10, 4))
