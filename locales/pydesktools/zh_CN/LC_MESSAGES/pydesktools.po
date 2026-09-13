@@ -634,3 +634,9 @@ msgstr "压缩预览"
 
 msgid "Space added"
 msgstr "增加空间"
+
+msgid "Quit PyDeskTools"
+msgstr "退出 PyDeskTools"
+
+msgid "Exit the application instead of keeping it in the system tray."
+msgstr "彻底退出应用，而不是继续驻留在系统托盘。"

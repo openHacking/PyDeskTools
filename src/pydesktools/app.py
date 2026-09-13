@@ -45,6 +45,7 @@ from pydeskui import (
 
 from ._version import VERSION
 from .platform import PlatformAdapter
+from .tray import create_tray
 from .ui import (
     GenericToolView,
     HomeView,
@@ -390,15 +391,24 @@ class Application:
         self._key_bindings = [
             ("<Control-k>", self.root.bind("<Control-k>", self.show_command_palette, add="+")),
             ("<Command-k>", self.root.bind("<Command-k>", self.show_command_palette, add="+")),
+            ("<Control-q>", self.root.bind("<Control-q>", lambda _event: self.quit(), add="+")),
             ("<Alt-Left>", self.root.bind("<Alt-Left>", self.go_home, add="+")),
             (
                 "<Command-bracketleft>",
                 self.root.bind("<Command-bracketleft>", self.go_home, add="+"),
             ),
         ]
+        self.tray = create_tray(
+            self.root,
+            config.display_name,
+            Path(__file__).parent / "assets",
+            self.show_window,
+            self.quit,
+        )
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         if sys.platform == "darwin":
-            self.root.tk.createcommand("::tk::mac::Quit", self.close)
+            self.root.tk.createcommand("::tk::mac::Quit", self.quit)
+            self.root.tk.createcommand("::tk::mac::ReopenApplication", self.show_window)
         self.root.report_callback_exception = lambda kind, value, tb: self.error(str(value))
         self.scheduler.call_later(25, self._poll)
         self._provision()
@@ -1023,6 +1033,7 @@ class Application:
                 usable = usable and bool(self.image_tool.pending_paths())
                 button.configure(text=self.image_tool.compression_label())
             button.state(["!disabled"] if usable else ["disabled"])
+        self.image_tool.sync_compression_action()
 
         self.image_tool.set_busy(self.active_action == "compress")
 
@@ -1391,9 +1402,33 @@ class Application:
         gc.collect()
 
     def close(self):
+        """Handle the window close control without ending the application."""
+        if self.closing:
+            return
+        if self.tray.available:
+            self.root.withdraw()
+        else:
+            self.quit()
+
+    def show_window(self):
+        if self.closing:
+            return
+        self.root.deiconify()
+        self.root.lift()
+        if sys.platform == "darwin":
+            try:
+                from AppKit import NSApplication
+
+                NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+            except ImportError:
+                pass
+
+    def quit(self):
+        """Request a full application shutdown from an explicit Quit action."""
         if self.closing:
             return
         if self.task:
+            self.show_window()
             self.confirm("Active work will be canceled. Continue?", self._close)
         else:
             self._close()
@@ -1411,6 +1446,7 @@ class Application:
         for entry in self.preview_cache.values():
             self.services.artifacts.release(entry[0])
         self.preview_cache.clear()
+        self.tray.close()
         self.platform.close()
         self.scheduler.close()
         for handle in reversed(self.extension_handles):

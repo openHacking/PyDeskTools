@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 license-files = ["LICENSE"]
-dependencies = ["Pillow>=12.3,<13", "pydeskui>=0.2.3,<0.3", "pydesktools-runtime>=0.1.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'", "tkinterdnd2>=0.6.3,<0.7"]
+dependencies = ["Pillow>=12.3,<13", "pydeskui>=0.2.3,<0.3", "pydesktools-runtime>=0.1.1,<0.2", "pyobjc-framework-Cocoa>=11,<13; sys_platform == 'darwin'", "pystray>=0.19.5,<0.20; sys_platform == 'linux'", "tkinterdnd2>=0.6.3,<0.7"]
 [project.scripts]
 pydesktools = "pydesktools.app:main"
 [project.optional-dependencies]

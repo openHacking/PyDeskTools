@@ -135,6 +135,9 @@ def pyinstaller_args(target, icon):
         ROOT / "build",
         ROOT / "scripts/desktop_entry.py",
     ]
+    if target == "linux-x86_64":
+        # pystray chooses its Linux backend dynamically, which static analysis cannot see.
+        args[-1:-1] = ["--collect-submodules", "pystray", "--collect-submodules", "Xlib"]
     return args
 
 

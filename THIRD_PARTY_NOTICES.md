@@ -3,6 +3,8 @@
 Project modules and the JSON plugin use MIT. PyDeskUI is an independent MIT
 library. Host dependencies: packaging (Apache-2.0/BSD-2-Clause), platformdirs (MIT),
 and tkinterdnd2/TkDND (MIT-style licenses).
+The Linux application additionally uses pystray 0.19.5 (LGPL-3.0), python-xlib
+0.33 (LGPL-2.1-or-later), and six 1.17.0 (MIT) for system-tray integration.
 The macOS application additionally uses PyObjC core/Cocoa 12.2.2 (MIT) for
 nonblocking native file panels; it is not a UI-core/runtime/SDK dependency.
 The JSON plugin's simplejson dependency retains MIT/Academic Free License terms

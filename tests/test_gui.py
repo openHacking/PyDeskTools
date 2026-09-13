@@ -10,10 +10,16 @@ from types import SimpleNamespace
 
 import pytest
 from PIL import Image
-from pydeskui import Select, Sidebar
+from pydeskui import Select, Sidebar, Theme
 
-from pydesktools.app import IMAGE_PLUGIN, ApplicationConfig, application_tokens, create_application
-from pydesktools.ui import _format_bytes
+from pydesktools.app import (
+    IMAGE_PLUGIN,
+    Application,
+    ApplicationConfig,
+    application_tokens,
+    create_application,
+)
+from pydesktools.ui import ImageCompressorView, _format_bytes
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +49,73 @@ def test_light_surfaces_and_binary_size_formatting():
     assert _format_bytes(1024) == "1.0 KB"
     assert _format_bytes(1023 * 1024) == "1,023.0 KB"
     assert _format_bytes(1024 * 1024) == "1.0 MB"
+
+
+def test_image_completed_status_replaces_the_disabled_action():
+    tk.NoDefaultRoot()
+    root = tk.Tk()
+    theme = Theme(root)
+    view = ImageCompressorView(
+        root,
+        translate=lambda value: value,
+        on_command=lambda _command: None,
+        on_preview=lambda: None,
+        on_discard=lambda _paths: None,
+        on_open_directory=lambda _path: None,
+        on_state_change=lambda: None,
+        on_drop=lambda _paths: False,
+        dnd_available=False,
+        theme=theme,
+    )
+    view.pack(fill="both", expand=True)
+    try:
+        view.files = ["sample.jpg"]
+        view.file_results = {"sample.jpg": {"status": "completed"}}
+        view._sync_layout()
+        view.sync_compression_action()
+        root.update()
+
+        assert view.completed_status.winfo_ismapped()
+        assert not view.buttons["compress"].winfo_ismapped()
+        assert view.completed_status.cget("text") == "Completed"
+        assert view.completed_status.cget("image")
+
+        view.file_results = {}
+        view.sync_compression_action()
+        root.update()
+
+        assert not view.completed_status.winfo_ismapped()
+        assert view.buttons["compress"].winfo_ismapped()
+    finally:
+        view.destroy()
+        theme.close()
+        root.destroy()
+
+
+def test_window_close_hides_when_tray_is_available():
+    calls = []
+    app = Application.__new__(Application)
+    app.closing = False
+    app.tray = SimpleNamespace(available=True)
+    app.root = SimpleNamespace(withdraw=lambda: calls.append("hide"))
+    app.quit = lambda: calls.append("quit")
+
+    app.close()
+
+    assert calls == ["hide"]
+
+
+def test_window_close_quits_when_platform_has_no_tray():
+    calls = []
+    app = Application.__new__(Application)
+    app.closing = False
+    app.tray = SimpleNamespace(available=False)
+    app.root = SimpleNamespace(withdraw=lambda: calls.append("hide"))
+    app.quit = lambda: calls.append("quit")
+
+    app.close()
+
+    assert calls == ["quit"]
 
 
 def test_application_flow(tmp_path, monkeypatch):
@@ -394,6 +467,8 @@ def test_image_compressor_app_flow(tmp_path, monkeypatch):
         assert "Saved" in row["text"]
         assert app.image_tool.buttons["compress"].instate(("disabled",))
         assert app.image_tool.buttons["compress"].cget("text") == "Completed"
+        assert not app.image_tool.buttons["compress"].winfo_ismapped()
+        assert app.image_tool.completed_status.winfo_ismapped()
         assert app.image_tool.queue_count.cget("text") == "0 Pending · 1 images selected"
         opened = []
         with monkeypatch.context() as patch:
@@ -428,6 +503,8 @@ def test_image_compressor_app_flow(tmp_path, monkeypatch):
         app.root.update()
         assert app.image_tool.pending_paths() == [str(source), str(added)]
         assert app.image_tool.buttons["compress"].cget("text") == "Recompress"
+        assert app.image_tool.buttons["compress"].winfo_ismapped()
+        assert not app.image_tool.completed_status.winfo_ismapped()
         app.run_command("compress")
         wait(app, lambda: app.task is None)
         assert len(list(tmp_path.glob("sample-compressed*.jpg"))) == 2
