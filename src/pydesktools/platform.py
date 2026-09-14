@@ -49,20 +49,23 @@ class PlatformAdapter:
         if capability == "dialogs.save_file" and selected:
             source = artifacts.path(plugin_id, arguments["artifact_id"])
             destination = Path(selected)
-            with tempfile.NamedTemporaryFile(
-                dir=destination.parent, prefix=".pydesk-", delete=False
-            ) as stream:
-                temporary = Path(stream.name)
-                try:
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    dir=destination.parent, prefix=".pydesk-", delete=False
+                ) as stream:
+                    temporary = Path(stream.name)
                     with source.open("rb") as src:
                         while chunk := src.read(1024 * 1024):
                             cancellation.raise_if_cancelled()
                             stream.write(chunk)
                     stream.flush()
                     os.fsync(stream.fileno())
-                    cancellation.raise_if_cancelled()
-                    os.replace(temporary, destination)
-                finally:
+                # Windows does not allow replacing an open NamedTemporaryFile.
+                cancellation.raise_if_cancelled()
+                os.replace(temporary, destination)
+            finally:
+                if temporary is not None:
                     temporary.unlink(missing_ok=True)
         return selected
 

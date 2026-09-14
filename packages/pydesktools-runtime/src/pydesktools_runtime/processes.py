@@ -14,6 +14,19 @@ from pydesktools_sdk import PluginError
 from pydesktools_sdk.protocol import encode, read, validate_progress_data
 
 
+def hidden_process_kwargs(os_name=None):
+    """Return native flags that keep background children out of the desktop UI."""
+    if (os_name or os.name) == "nt":
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
+def background_popen(args, **kwargs):
+    """Start an internal background process without exposing platform UI."""
+    kwargs.update(hidden_process_kwargs())
+    return subprocess.Popen(args, **kwargs)
+
+
 def terminate_process(process, *, force=False):
     """Stop a child process using the native process model."""
     if os.name == "nt":
@@ -55,7 +68,7 @@ class WorkerProcess:
             if not k.startswith(("PYTHON", "_PYI", "DYLD_", "LD_LIBRARY_PATH"))
         }
         env.update(PYTHONNOUSERSITE="1", PYTHONUTF8="1")
-        self.process = subprocess.Popen(
+        self.process = background_popen(
             [
                 str(python),
                 "-I",

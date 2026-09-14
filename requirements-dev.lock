@@ -39,8 +39,10 @@ pyinstaller-hooks-contrib==2026.7
 pyinstaller==6.22.2
 pyobjc-core==12.2.2
 pyobjc-framework-Cocoa==12.2.2
+pystray==0.19.5
 pyproject_hooks==1.2.0
 pytest==9.1.1
+python-xlib==0.33
 readme_renderer==46.0
 requests-toolbelt==1.0.0
 requests==2.34.2
@@ -49,6 +51,7 @@ rich==15.0.0
 roman-numerals==4.1.0
 ruff==0.16.6
 setuptools==84.0.0
+six==1.17.0
 simplejson==3.20.2
 snowballstemmer==3.1.1
 sphinxcontrib-applehelp==2.0.0

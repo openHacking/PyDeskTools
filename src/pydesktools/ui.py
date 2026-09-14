@@ -673,6 +673,7 @@ class ImageCompressorView(PaddedSurface):
         on_command,
         on_preview,
         on_discard,
+        on_open_directory,
         on_state_change,
         on_drop,
         dnd_available,
@@ -682,6 +683,7 @@ class ImageCompressorView(PaddedSurface):
         self.t = translate
         self.on_preview = on_preview
         self.on_discard = on_discard
+        self.on_open_directory = on_open_directory
         self.on_state_change = on_state_change
         self.on_drop = on_drop
         self.dnd_available = dnd_available
@@ -736,6 +738,14 @@ class ImageCompressorView(PaddedSurface):
             )
             button.pack(side="left" if command == "import_images" else "right", padx=(0, 10))
             self.buttons[command] = button
+        self.completed_status = Badge(
+            toolbar,
+            text=self.t("Completed"),
+            variant="secondary",
+            compound="left",
+            padding=(theme.px(12), theme.px(8)),
+            theme=theme,
+        )
         self.queue_count = Label(
             toolbar,
             text=self.t("No images selected"),
@@ -972,6 +982,8 @@ class ImageCompressorView(PaddedSurface):
         for status, (name, color) in specifications.items():
             icons[status] = self.theme.icon_image(name, size=16, color=color)
         self._status_icons = icons
+        if hasattr(self, "completed_status"):
+            self.completed_status.configure(image=icons["completed"])
 
     def _queue_hover(self, event):
         path = self.queue.tree.identify_row(event.y)
@@ -1063,11 +1075,10 @@ class ImageCompressorView(PaddedSurface):
         self.on_state_change()
 
     def _open_output(self):
-        import webbrowser
         selected = self.file_results.get(self.selected_path or "", {}).get("output")
         directories = [Path(selected).parent] if selected else self.output_directories
         for directory in directories:
-            webbrowser.open(directory.as_uri())
+            self.on_open_directory(directory)
 
     def _select(self, master, title, key, values):
         Label(master, text=self.t(title), theme=self.theme).pack(anchor="w", pady=(10, 4))
@@ -1296,6 +1307,18 @@ class ImageCompressorView(PaddedSurface):
         ):
             return self.t("Retry failed images")
         return self.t("Compress images")
+
+    def sync_compression_action(self):
+        completed = bool(self.files and not self.pending_paths())
+        button = self.buttons["compress"]
+        if completed:
+            button.pack_forget()
+            if not self.completed_status.winfo_manager():
+                self.completed_status.pack(side="right", padx=(0, 10))
+        else:
+            self.completed_status.pack_forget()
+            if not button.winfo_manager():
+                button.pack(side="right", padx=(0, 10))
 
     def arguments(self):
         def dimension(name):
@@ -1959,6 +1982,16 @@ class SettingsView(PaddedSurface):
         )
         row.pack(fill="x")
         Badge(row, text="⌘ K  /  Ctrl K", variant="outline", theme=theme).pack(side="right")
+        Separator(shortcuts, theme=theme).pack(fill="x")
+        row = _settings_row(
+            shortcuts,
+            title=self.t("Quit PyDeskTools"),
+            description=self.t("Exit the application instead of keeping it in the system tray."),
+            icon="x",
+            theme=theme,
+        )
+        row.pack(fill="x")
+        Badge(row, text="⌘ Q  /  Ctrl Q", variant="outline", theme=theme).pack(side="right")
 
         sources = self._section(
             "sources", "Plugin sources", "This release installs local bundles only."

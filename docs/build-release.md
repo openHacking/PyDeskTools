@@ -52,12 +52,35 @@ to ad-hoc signing.
 
 ### Windows
 
-Run on Windows x64 after generating `logo.ico` with `scripts/build_brand_assets.py`:
+Install [Inno Setup 6](https://jrsoftware.org/isdl.php), which provides the
+`ISCC.exe` compiler used to create the installer. It can be installed interactively
+with Windows Package Manager:
 
 ```powershell
-python scripts/build_windows.py `
-  --runtime-source build/plugin-runtime/windows-x86_64/python
+winget install --id JRSoftware.InnoSetup -e -s winget -i
 ```
+
+After installation, open a new PowerShell window. A per-user installation normally
+places the compiler under `%LOCALAPPDATA%`; a system-wide installation normally
+places it under `Program Files (x86)`. Run the following complete block on Windows
+x64 after generating `logo.ico` with `scripts/build_brand_assets.py`:
+
+```powershell
+$iscc = @(
+  (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
+  'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+if (-not $iscc) { throw 'Inno Setup 6 ISCC.exe was not found' }
+
+python scripts/build_windows.py `
+  --runtime-source build/plugin-runtime/windows-x86_64/python `
+  --iscc $iscc
+```
+
+If Inno Setup was installed elsewhere, pass the actual path to `ISCC.exe` instead.
+Specifying `--iscc` explicitly avoids relying on the installer directory being added
+to `PATH`.
 
 The output is deliberately named `windows-x64-unsigned.exe`. It installs per-user and
 supports silent installation/uninstallation for verification. Do not remove the

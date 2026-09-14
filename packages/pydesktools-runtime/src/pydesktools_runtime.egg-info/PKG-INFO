@@ -1,12 +1,12 @@
 Metadata-Version: 2.4
 Name: pydesktools-runtime
-Version: 0.1.0
+Version: 0.1.1
 Summary: PyDeskTools isolated plugin architecture
 License-Expression: MIT
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: pydesktools-sdk<0.2,>=0.1
+Requires-Dist: pydesktools-sdk<0.2,>=0.1.1
 Requires-Dist: packaging<27,>=24
 Requires-Dist: platformdirs<5,>=4
 Dynamic: license-file

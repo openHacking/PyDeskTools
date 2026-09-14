@@ -39,6 +39,10 @@ Use the sidebar, search, command palette, file picker, or drag and drop. English
 Simplified Chinese, light/dark appearance, plugin lifecycle controls, and a private
 local data directory are built in.
 
+Closing the main window keeps PyDeskTools available from the Windows notification
+area, macOS menu bar, or a supported Linux system tray. Use the tray menu or `Ctrl+Q`
+(`Command+Q` on macOS) to quit the application completely.
+
 ## Download v0.1.0
 
 PyDeskTools 0.1.0 is an experimental pre-release. Download only from the

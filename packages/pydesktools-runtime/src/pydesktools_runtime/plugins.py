@@ -22,7 +22,7 @@ from pydesktools_sdk import CancellationToken, PluginError
 from pydesktools_sdk import __version__ as sdk_version
 from pydesktools_sdk.protocol import descriptor
 
-from .processes import WorkerProcess, terminate_process
+from .processes import WorkerProcess, background_popen, terminate_process
 
 
 def platform_label(system=None, machine=None):
@@ -263,8 +263,13 @@ class Installer:
             if not k.startswith(("PYTHON", "PIP_", "_PYI", "DYLD_", "LD_LIBRARY_PATH"))
         }
         with tempfile.TemporaryFile() as log:
-            process = subprocess.Popen(
-                args, stdout=log, stderr=log, env=env, start_new_session=True, cwd=self.store.root
+            process = background_popen(
+                args,
+                stdout=log,
+                stderr=log,
+                env=env,
+                start_new_session=True,
+                cwd=self.store.root,
             )
             deadline = time.monotonic() + timeout
             try:
