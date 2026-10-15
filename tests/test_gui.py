@@ -26,17 +26,19 @@ from pydesktools.ui import ImageCompressorView, _format_bytes
 
 def test_port_manager_worker_and_desktop_flow(tmp_path, monkeypatch):
     monkeypatch.setattr("pydesktools.app.preferred_locale", lambda: "zh-CN")
-    process = subprocess.Popen(
-        [sys.executable, "-u", "-c", "import socket,time; s=socket.socket(); "
-         "s.bind(('127.0.0.1',0)); s.listen(); print(s.getsockname()[1],flush=True); time.sleep(120)"],
-        stdout=subprocess.PIPE, text=True,
-    )
-    port = int(process.stdout.readline())
+    tk.NoDefaultRoot()
     app = create_application(ApplicationConfig(data_dir=tmp_path / "ports-profile"))
+    process = None
     errors = []
     app.error = errors.append
     try:
         wait(app, lambda: not app.background_busy, timeout=45)
+        process = subprocess.Popen(
+            [sys.executable, "-u", "-c", "import socket,time; s=socket.socket(); "
+             "s.bind(('127.0.0.1',0)); s.listen(); print(s.getsockname()[1],flush=True); time.sleep(120)"],
+            stdout=subprocess.PIPE, text=True,
+        )
+        port = int(process.stdout.readline())
         assert app.services.store.get(PORT_PLUGIN)["enabled"]
         assert app.sidebar.buttons[PORT_PLUGIN].cget("text") == "端口管理"
         app.navigate("tool", PORT_PLUGIN)
@@ -75,10 +77,11 @@ def test_port_manager_worker_and_desktop_flow(tmp_path, monkeypatch):
     finally:
         app._close()
         app._shutdown_thread.join(15)
-        if process.poll() is None:
-            process.kill()
-        process.wait(timeout=5)
-        process.stdout.close()
+        if process is not None:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            process.stdout.close()
 
 
 def test_port_manager_filter_invalidates_hidden_selection():
