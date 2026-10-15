@@ -68,5 +68,8 @@ jobs:
       - run: mypy
       - name: Run desktop tests with hang diagnostics
         timeout-minutes: 5
-        run: python -m pytest -vv -o faulthandler_timeout=60
+        run: >-
+          python -c 'import subprocess, sys;
+          subprocess.run([sys.executable, "-m", "pytest", "-vv", "-o", "faulthandler_timeout=60"],
+          check=True, timeout=180)'
       - run: python -m build && python -m twine check dist/*.whl dist/*.tar.gz
