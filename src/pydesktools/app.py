@@ -176,7 +176,8 @@ def _follow_system_appearance(root):
             hosts.add(widget.winfo_toplevel())
             pending.extend(widget.winfo_children())
         for host in hosts:
-            host.wm_attributes("-appearance", "auto")
+            if host.wm_attributes("-appearance") != "auto":
+                host.wm_attributes("-appearance", "auto")
     except tk.TclError:
         pass
 
@@ -1426,6 +1427,11 @@ class Application:
 
     def _system_appearance_changed(self, mode):
         if self.theme_preference == "system":
+            # Theme.configure temporarily sets a fixed native appearance. Its
+            # queued Aqua events can be stale by the time Tk dispatches them.
+            # Resolve the actual system mode rather than feeding those events
+            # back into another fixed/auto appearance switch.
+            mode = preferred_theme(self.root)
             if self.theme.mode != mode:
                 self.theme.configure(mode=mode, tokens=application_tokens(mode), accent="#1677FF")
             _follow_system_appearance(self.root)

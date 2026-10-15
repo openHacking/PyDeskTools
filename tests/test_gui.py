@@ -581,7 +581,11 @@ def test_pydeskui_composition_busy_feedback_and_standalone_navigation(tmp_path, 
         assert app.theme.mode == "light"
         if app.root.tk.call("tk", "windowingsystem") == "aqua":
             assert app.root.wm_attributes("-appearance") == "auto"
+        monkeypatch.setattr("pydesktools.app.preferred_theme", lambda root: "dark")
         app._system_appearance_changed("dark")
+        assert app.theme.mode == "dark"
+        # A queued event from the theme's former fixed appearance is stale.
+        app._system_appearance_changed("light")
         assert app.theme.mode == "dark"
         if app.root.tk.call("tk", "windowingsystem") == "aqua":
             assert app.root.wm_attributes("-appearance") == "auto"
