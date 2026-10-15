@@ -1,5 +1,6 @@
 """Explicit application composition and the macOS-first offline toolbox."""
 
+import errno
 import gc
 import gettext
 import hashlib
@@ -259,7 +260,9 @@ def runtime_python(config):
                 verify(candidate)
                 try:
                     candidate.rename(destination)
-                except FileExistsError:
+                except OSError as error:
+                    if error.errno not in (errno.EEXIST, errno.ENOTEMPTY):
+                        raise
                     # Another instance atomically published the same verified runtime.
                     # Its completed directory is safe to share.
                     pass

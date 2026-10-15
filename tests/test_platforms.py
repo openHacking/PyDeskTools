@@ -51,6 +51,8 @@ def test_venv_python_uses_native_layout():
 
 
 def test_windows_plugin_processes_do_not_create_a_console(monkeypatch):
+    # Simulate Windows constants and process creation on non-Windows test hosts.
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
     kwargs = hidden_process_kwargs("nt")
     assert kwargs == {"creationflags": subprocess.CREATE_NO_WINDOW}
     assert hidden_process_kwargs("posix") == {}
@@ -61,6 +63,7 @@ def test_windows_plugin_processes_do_not_create_a_console(monkeypatch):
         return args
 
     monkeypatch.setattr("pydesktools_runtime.processes.subprocess.Popen", popen)
+    monkeypatch.setattr("pydesktools_runtime.processes.hidden_process_kwargs", lambda: kwargs)
     assert background_popen(["worker.exe"], stdin=subprocess.PIPE) == ["worker.exe"]
     assert captured == {
         "stdin": subprocess.PIPE,
