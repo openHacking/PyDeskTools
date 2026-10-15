@@ -66,5 +66,7 @@ jobs:
       - run: python scripts/build_bundles.py --target macos-arm64 --runtime-source build/plugin-runtime/macos-arm64/python
       - run: ruff check src packages plugins scripts tests
       - run: mypy
-      - run: python -m pytest
+      - name: Run desktop tests with hang diagnostics
+        timeout-minutes: 5
+        run: python -m pytest -vv -o faulthandler_timeout=60
       - run: python -m build && python -m twine check dist/*.whl dist/*.tar.gz
