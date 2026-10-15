@@ -49,7 +49,7 @@ jobs:
         run: python -c "import platform, tkinter; print(platform.python_version(), platform.machine(), 'Tk', tkinter.TkVersion); assert platform.machine() == 'AMD64'; assert tkinter.TkVersion >= 9"
 
   desktop-macos:
-    runs-on: macos-15
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
