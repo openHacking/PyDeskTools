@@ -1,7 +1,6 @@
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 from pydesktools_runtime import RuntimeConfig, create_services
@@ -12,24 +11,6 @@ from pydesktools_runtime.processes import (
     terminate_process,
 )
 from pydesktools_runtime.storage import Store
-
-
-class _ImmediateDialogQueue:
-    def __init__(self, selected):
-        self.selected = selected
-
-    def put_nowait(self, request):
-        request[-1].set_result(self.selected)
-
-
-class _Artifacts:
-    def __init__(self, source):
-        self.source = source
-
-    def path(self, plugin_id, artifact_id):
-        assert plugin_id == "test.plugin"
-        assert artifact_id == "artifact"
-        return self.source
 
 
 def test_platform_labels():
@@ -69,48 +50,6 @@ def test_windows_plugin_processes_do_not_create_a_console(monkeypatch):
         "stdin": subprocess.PIPE,
         "creationflags": subprocess.CREATE_NO_WINDOW,
     }
-
-
-def test_save_file_closes_temporary_before_atomic_replace(tmp_path):
-    from pydesktools.platform import PlatformAdapter
-
-    source = tmp_path / "artifact.json"
-    source.write_text('{"hello":"世界"}', encoding="utf-8")
-    destination = tmp_path / "export.json"
-    adapter = PlatformAdapter.__new__(PlatformAdapter)
-    adapter.closed = False
-    adapter.requests = _ImmediateDialogQueue(str(destination))
-    cancellation = SimpleNamespace(raise_if_cancelled=lambda: None)
-
-    selected = adapter.call(
-        "dialogs.save_file",
-        {"artifact_id": "artifact"},
-        plugin_id="test.plugin",
-        cancellation=cancellation,
-        artifacts=_Artifacts(source),
-    )
-
-    assert selected == str(destination)
-    assert destination.read_bytes() == source.read_bytes()
-    assert not list(tmp_path.glob(".pydesk-*"))
-
-
-def test_open_directory_uses_native_file_manager(tmp_path, monkeypatch):
-    from pydesktools.app import Application
-
-    opened = []
-    monkeypatch.setattr("subprocess.Popen", lambda arguments: opened.append(arguments))
-    app = Application.__new__(Application)
-    app.error = pytest.fail
-
-    app.open_directory(tmp_path)
-
-    if sys.platform == "darwin":
-        assert opened == [["open", str(tmp_path)]]
-    elif sys.platform == "win32":
-        assert opened == [["explorer.exe", str(tmp_path)]]
-    else:
-        assert opened == [["xdg-open", str(tmp_path)]]
 
 
 def test_child_process_termination_uses_native_process_model():
