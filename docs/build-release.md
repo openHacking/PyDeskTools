@@ -100,7 +100,7 @@ python scripts/build_linux.py \
 ```
 
 The compatibility floor is Ubuntu 22.04-era glibc. Verification runs under Xvfb. X11
-and XWayland are supported for 0.1.0; native Wayland behavior is not certified.
+and XWayland are supported for 0.2.0; native Wayland behavior is not certified.
 
 ## Draft release workflow
 
@@ -109,7 +109,7 @@ Do not upload a locally built DMG as a release artifact, and do not create the t
 until the exact release commit has passed CI. The workflow creates a Draft
 Pre-release; publishing it is deliberately a separate manual decision.
 
-The examples below use `v0.1.0`. Replace it consistently when preparing a later
+The examples below use `v0.2.0`. Replace it consistently when preparing a later
 version. Run all commands from the repository root.
 
 ### 1. Prepare and validate the release commit
@@ -125,13 +125,13 @@ test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
 Review the changes intended for the release. Update `CHANGELOG.md` and the matching
 release-notes file, and make sure neither describes the version as unreleased. The
-release workflow currently reads `docs/release-notes-v0.1.0.md`; a future release
-must update both that path in `.github/workflows/release.yml` and the file itself.
+release workflow reads `docs/release-notes-${RELEASE_TAG}.md`; each release must
+provide its matching notes file and update the default tag in the workflow.
 
 Run the same fail-closed version check used by the release workflow:
 
 ```sh
-python scripts/validate_release.py --tag v0.1.0
+python scripts/validate_release.py --tag v0.2.0
 ```
 
 This checks the application version, component versions, changelog heading, and
@@ -168,10 +168,10 @@ tag and push only that tag:
 
 ```sh
 git status --short --branch
-git tag -a v0.1.0 -m "PyDeskTools v0.1.0"
-git show --no-patch --decorate v0.1.0
-git push origin v0.1.0
-git ls-remote --exit-code --tags origin refs/tags/v0.1.0
+git tag -a v0.2.0 -m "PyDeskTools v0.2.0"
+git show --no-patch --decorate v0.2.0
+git push origin v0.2.0
+git ls-remote --exit-code --tags origin refs/tags/v0.2.0
 ```
 
 Do not move, force-push, or silently recreate a published version tag. If the tag is
@@ -183,12 +183,12 @@ running the release workflow.
 Trigger **Draft desktop release** with the tag that now exists on GitHub:
 
 ```sh
-gh workflow run release.yml -f tag=v0.1.0
+gh workflow run release.yml -f tag=v0.2.0
 gh run list --workflow release.yml --event workflow_dispatch --limit 5
 ```
 
 Alternatively, open **Actions > Draft desktop release > Run workflow**, enter
-`v0.1.0`, and start the run. Copy the new run ID and wait for completion if desired:
+`v0.2.0`, and start the run. Copy the new run ID and wait for completion if desired:
 
 ```sh
 gh run watch RUN_ID --exit-status
@@ -214,13 +214,13 @@ rather than publishing incomplete assets or quietly moving a release tag.
 
 ### 5. Inspect the Draft and its final assets
 
-Open **Releases**, find the `PyDeskTools 0.1.0` draft, and first check its title,
+Open **Releases**, find the `PyDeskTools 0.2.0` draft, and first check its title,
 Pre-release flag, notes, tag, and complete asset list. Download the assets generated
 by CI rather than inspecting a local build:
 
 ```sh
 release_dir="$(mktemp -d)"
-gh release download v0.1.0 --dir "$release_dir"
+gh release download v0.2.0 --dir "$release_dir"
 cd "$release_dir"
 shasum -a 256 --check SHA256SUMS.txt
 ```
@@ -265,7 +265,7 @@ setting only to future published releases, so it must be enabled before clicking
 Publish. See GitHub's [immutable release instructions](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes).
 
 Return to the Draft Release and perform one final review. Keep **Set as a pre-release**
-enabled for this experimental `0.1.0` release, then click **Publish release**. Once an
+enabled for this experimental `0.2.0` release, then click **Publish release**. Once an
 immutable release is published, its assets and associated tag cannot be modified or
 deleted while the release exists; only metadata such as the title, notes, Pre-release
 flag, and Latest flag remains editable.
@@ -273,8 +273,8 @@ flag, and Latest flag remains editable.
 Confirm the result:
 
 ```sh
-gh release view v0.1.0 --json tagName,isDraft,isPrerelease,isImmutable,publishedAt,url
-gh release verify v0.1.0
+gh release view v0.2.0 --json tagName,isDraft,isPrerelease,isImmutable,publishedAt,url
+gh release verify v0.2.0
 ```
 
 The expected state is `isDraft: false`, `isPrerelease: true`, and
@@ -379,7 +379,7 @@ not require paid larger runners. Intermediate Actions artifacts are retained for
 day; durable installers and manifests live on the GitHub Release. Keep the dependency
 cache below GitHub's repository cache allowance. The expected GitHub-side cost is zero
 under the public-repository allowance. The recurring external cost is the Apple
-Developer Program membership used for Developer ID signing; Windows 0.1.0 deliberately
+Developer Program membership used for Developer ID signing; Windows 0.2.0 deliberately
 does not purchase or require a code-signing certificate.
 
 ## Local packaged diagnostic

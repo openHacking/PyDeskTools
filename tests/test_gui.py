@@ -2,6 +2,7 @@
 
 import gc
 import json
+import subprocess
 import sys
 import time
 import tkinter as tk
@@ -14,12 +15,236 @@ from pydeskui import Select, Sidebar, Theme
 
 from pydesktools.app import (
     IMAGE_PLUGIN,
+    PORT_PLUGIN,
     Application,
     ApplicationConfig,
     application_tokens,
     create_application,
 )
 from pydesktools.ui import ImageCompressorView, _format_bytes
+
+
+def test_port_manager_worker_and_desktop_flow(tmp_path, monkeypatch):
+    monkeypatch.setattr("pydesktools.app.preferred_locale", lambda: "zh-CN")
+    process = subprocess.Popen(
+        [sys.executable, "-u", "-c", "import socket,time; s=socket.socket(); "
+         "s.bind(('127.0.0.1',0)); s.listen(); print(s.getsockname()[1],flush=True); time.sleep(120)"],
+        stdout=subprocess.PIPE, text=True,
+    )
+    port = int(process.stdout.readline())
+    app = create_application(ApplicationConfig(data_dir=tmp_path / "ports-profile"))
+    errors = []
+    app.error = errors.append
+    try:
+        wait(app, lambda: not app.background_busy, timeout=45)
+        assert app.services.store.get(PORT_PLUGIN)["enabled"]
+        assert app.sidebar.buttons[PORT_PLUGIN].cget("text") == "端口管理"
+        app.navigate("tool", PORT_PLUGIN)
+        wait(app, lambda: str(process.pid) in app.port_tool.services, timeout=30)
+        wait(app, lambda: app.task is None)
+        assert not errors
+        view = app.port_tool
+        app.root.geometry("1100x720")
+        app.root.update()
+        assert view.winfo_ismapped()
+        assert not view.scope.is_open
+        assert view.inspector.winfo_y() + view.inspector.winfo_height() <= view.winfo_height()
+        assert view.scan_button.cget("text") == "扫描端口"
+        assert str(process.pid) in view.table.get_children()
+        assert view.table.heading("ports", "text") == "端口"
+        view.select(str(process.pid))
+        app.root.update()
+        assert view.detail.text.winfo_height() >= 6 * app.theme.font.metrics("linespace")
+        assert view.detail.winfo_y() + view.detail.winfo_height() <= view.inspector.winfo_height()
+        assert not view.stop_button.instate(["disabled"])
+        # A cancel leaves the disposable listener running.
+        confirmations = []
+        app.confirm = lambda message, callback: confirmations.append((message, callback))
+        view.request_stop(False)
+        assert len(confirmations) == 1 and str(port) in confirmations[0][0]
+        assert process.poll() is None
+        # Execute only the confirmed request, through the isolated plugin worker.
+        confirmations[0][1]()
+        wait(app, lambda: app.task is None, timeout=30)
+        assert not errors
+        assert process.poll() is not None
+        assert str(process.pid) not in view.services
+        assert view.stop_button.instate(["disabled"])
+        assert "进程已退出" in view.status.cget("text")
+        assert str(port) in view.status.cget("text")
+    finally:
+        app._close()
+        app._shutdown_thread.join(15)
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+        process.stdout.close()
+
+
+def test_port_manager_filter_invalidates_hidden_selection():
+    from pydesktools.ports import PortManagerView
+
+    tk.NoDefaultRoot()
+    root = tk.Tk()
+    theme = Theme(root)
+    stops = []
+    view = PortManagerView(root, translate=lambda s: s, on_scan=lambda: None,
+                           on_stop=lambda *args: stops.append(args), theme=theme)
+    try:
+        service = {"pid": 42, "token": "token", "name": "node", "project": "demo",
+                   "cwd": "/demo", "command": "node server", "username": "me",
+                   "age_seconds": 60, "development": True, "can_stop": True,
+                   "endpoints": [{"address": "127.0.0.1", "port": 5173}]}
+        view.set_result({"services": [service], "warnings": [], "status": ""})
+        view.select("42")
+        view.set_busy(True)
+        view.request_stop(False)
+        assert not stops
+        view.set_busy(False)
+        view.search.delete(0, "end")
+        view.search.insert(0, "absent")
+        view.render()
+        view.request_stop(False)
+        assert not stops
+        assert not view.table.get_children()
+        assert view.stop_button.instate(["disabled"])
+    finally:
+        view.destroy()
+        theme.close()
+        root.destroy()
+
+
+@pytest.mark.parametrize("mode", ["light", "dark"])
+def test_port_table_headers_overflow_and_full_details(mode):
+    from pydesktools.ports import PortManagerView
+
+    tk.NoDefaultRoot()
+    root = tk.Tk()
+    root.geometry("830x660")
+    theme = Theme(root, mode=mode, tokens=application_tokens(mode))
+    view = PortManagerView(root, translate=lambda value: value, on_scan=lambda: None,
+                           on_stop=lambda *_: None, theme=theme)
+    view.pack(fill="both", expand=True)
+    service = {"pid": 27161, "token": "selected", "name": "node",
+               "project": "codex-showcase-promotion-with-a-long-project-name",
+               "cwd": "/projects/" + "deep-directory/" * 8,
+               "command": "node " + "server-argument " * 30, "username": "developer",
+               "age_seconds": 384180, "development": True, "can_stop": True,
+               "endpoints": [{"address": "127.0.0.1", "port": 9229},
+                             {"address": "127.0.0.1", "port": 53899},
+                             {"address": "::1", "port": 3000}]}
+    try:
+        view.set_result({"services": [service], "status": "", "warnings": ["Scope details"]})
+        root.update()
+        assert tuple(map(str, view.table.cget("show"))) == ("headings",)
+        assert tuple(view.table.heading(c, "text") for c in view.COLUMNS) == view.HEADINGS
+        values = view.table.item("27161", "values")
+        assert values[0] == "3000, 9229, 53899"
+        assert values[1] == service["project"]
+        assert values[4] == "4d 10h"
+        # The original screenshot lost the right part of a row silently. Here
+        # full strings fit their columns and the final column is reachable.
+        assert view.horizontal.winfo_ismapped()
+        for column, value in zip(view.COLUMNS, values):
+            assert view.table.column(column, "width") >= theme.font.measure(value) + 24
+        view.table.xview_moveto(1)
+        root.update()
+        assert view.table.xview()[1] == 1
+        view.table.selection_set("27161")
+        root.update()
+        assert view.selected["pid"] == 27161
+        assert view.detail.winfo_ismapped()
+        assert view.inspector.winfo_y() + view.inspector.winfo_height() <= view.winfo_height()
+        text = view.detail.text.get("1.0", "end")
+        assert "[::1]:3000" in text
+        assert service["cwd"] in text and service["command"] in text
+        assert view.detail.text.cget("wrap") == "word"
+        assert not view.force_button.winfo_viewable()
+        assert not view.scope.is_open
+        view.show_more()
+        root.update()
+        assert view.more.is_open and view.force_button.winfo_viewable()
+        view.more.hide()
+        root.update()
+        view.show_scope()
+        root.update()
+        assert view.scope.is_open and view.warning.winfo_viewable()
+        view.scope.hide()
+        theme.configure(font_size=18)
+        root.update()
+        assert view.table.column("project", "width") >= theme.font.measure(service["project"]) + 24
+    finally:
+        view.destroy()
+        theme.close()
+        root.destroy()
+
+
+def test_port_table_numeric_sort_keeps_inspector_and_actions_on_visible_selection():
+    from pydesktools.ports import PortManagerView
+
+    tk.NoDefaultRoot()
+    root = tk.Tk()
+    theme = Theme(root)
+    stops = []
+    view = PortManagerView(root, translate=lambda value: value, on_scan=lambda: None,
+                           on_stop=lambda service, force: stops.append((service["pid"], force)), theme=theme)
+    try:
+        base = {"token": "selection", "name": "node", "project": "demo", "cwd": "/demo",
+                "command": "node server", "username": "developer", "development": True,
+                "can_stop": True}
+        view.set_result({"services": [
+            {**base, "pid": 100, "age_seconds": 20, "endpoints": [{"address": "::1", "port": 9000}]},
+            {**base, "pid": 9, "age_seconds": 300, "endpoints": [{"address": "::1", "port": 80}]},
+        ], "status": "", "warnings": []})
+        assert view.table.get_children() == ("9", "100")
+        view.select("100")
+        view.table.request_sort("pid")
+        assert view.table.get_children() == ("9", "100")
+        assert view.selected["pid"] == 100
+        view.table.request_sort("pid")
+        assert view.table.get_children() == ("100", "9")
+        view.request_stop(False)
+        assert stops == [(100, False)]
+        view.search.insert(0, "absent")
+        view.render()
+        assert view.selected is None and not view.table.selection()
+        view.request_stop(True)
+        assert stops == [(100, False)]
+    finally:
+        view.destroy()
+        theme.close()
+        root.destroy()
+
+
+def test_port_table_shrinking_window_keeps_all_normal_columns_visible():
+    from pydesktools.ports import PortManagerView
+
+    tk.NoDefaultRoot()
+    root = tk.Tk()
+    root.geometry("1100x660")
+    theme = Theme(root)
+    view = PortManagerView(root, translate=lambda value: value, on_scan=lambda: None,
+                           on_stop=lambda *_: None, theme=theme)
+    view.pack(fill="both", expand=True)
+    try:
+        service = {"pid": 27161, "token": "selection", "name": "node",
+                   "project": "codex-showcase-promotion", "cwd": "/projects/demo",
+                   "command": "node server", "username": "developer", "age_seconds": 384180,
+                   "development": True, "can_stop": True,
+                   "endpoints": [{"address": "::1", "port": 3000}]}
+        view.set_result({"services": [service], "status": "", "warnings": []})
+        root.update()
+        root.geometry("830x660")
+        root.update()
+        assert view.table.xview() == (0, 1)
+        assert not view.horizontal.winfo_ismapped()
+        x, _, width, _ = view.table.bbox("27161", "uptime")
+        assert x >= 0 and x + width <= view.table.winfo_width()
+        assert all(view.table.heading(c, "text") for c in view.COLUMNS)
+    finally:
+        view.destroy()
+        theme.close()
+        root.destroy()
 
 
 @pytest.fixture(autouse=True)

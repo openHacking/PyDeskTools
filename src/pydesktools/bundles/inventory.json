@@ -1,4 +1,5 @@
 {
-  "image-compressor.pdtplugin": "db3295df164f0a28775a8eda520c25bfaf945079b44632f53f6015d86b91c979",
-  "json-tools.pdtplugin": "2102e93914a8935258c9191a719851283694a1cb0589faa3ec0637c14d512ce9"
+  "image-compressor.pdtplugin": "e7ec153dc519e9775e744d805cbe107dcdc38c7395143017511d0eb282915eed",
+  "json-tools.pdtplugin": "af66852752941d3b0bcaf6368952601932ece4bc62a25060eb389092b6880444",
+  "port-manager.pdtplugin": "82e1f0d62ef1c7a55c65fbf6ea40b5d41240b4e63d7b4c7d5fc430eea9d53d01"
 }

@@ -9,5 +9,6 @@ prune packages/pydesktools-sdk/build
 prune packages/pydesktools-runtime/build
 prune plugins/json-tools/build
 prune plugins/image-compressor/build
+prune plugins/port-manager/build
 
 recursive-include locales *.po

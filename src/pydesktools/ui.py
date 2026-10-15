@@ -231,7 +231,8 @@ class ToolSidebar(Sidebar):
                     text=display_name,
                     command=lambda value=identifier: self.on_navigate("tool", value),
                     theme=self.theme,
-                    icon="json" if identifier == JSON_PLUGIN else "image",
+                    icon="json" if identifier == JSON_PLUGIN else (
+                        "plugin" if identifier == "org.pydesk.port-manager" else "image"),
                 )
                 self.buttons[identifier] = button
             elif button.cget("text") != display_name:

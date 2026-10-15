@@ -1,0 +1,51 @@
+# Port Manager
+
+Offline PyDeskTools plugin for inspecting local TCP listeners and stopping one
+selected process at a time. The application supplies a dedicated searchable view,
+development hints, an all-listeners filter, process details and confirmation dialogs.
+
+Run from the repository development environment:
+
+```sh
+python -m pip install -e plugins/port-manager
+python scripts/build_bundles.py --target macos-arm64
+python -m pydesktools
+```
+
+The first-party bundle is provisioned with the other default tools. Choose Port
+Manager in the sidebar. Scanning happens on entry and on **Scan ports**; stopping
+a service also refreshes the list. Search matches ports, project paths, commands
+and PIDs. Development labels are heuristic and may include non-development apps.
+Use **All listeners** when a service does not appear in the default filter.
+
+The table separates ports, project, process, PID and uptime into named columns;
+click a heading to sort. Columns fit their full text, with horizontal scrolling
+when long values exceed the window width. Select a row to inspect all listening
+addresses, the project directory and the startup command in the detail panel.
+**Stop service** acts on that selected process; **More actions → Force termination**
+provides the separate force option. **Scan scope** contains visibility information.
+
+## Scope and termination
+
+- TCP listening sockets only; IPv4 and IPv6 are deduplicated by process/address/port.
+- Project names come from working directories, which may be unavailable.
+- macOS uses `/usr/sbin/lsof` field output without sudo; Linux and Windows use
+  psutil. Visibility depends on OS permissions. No privilege elevation is offered.
+- Only current-user processes can be stopped. PID 1, the worker and its ancestors
+  (including the host) are protected. No process trees or process groups are killed.
+- A session-local opaque token binds a selection to PID, creation time and its
+  complete observed endpoint set. Refresh invalidates prior selections. The worker
+  rechecks identity, ownership and endpoints before termination; psutil also guards
+  PID reuse during signalling. This reduces races, but enumeration and signalling
+  are not one atomic OS operation.
+- On POSIX, Stop sends SIGTERM and waits up to three seconds. Force termination
+  sends SIGKILL only after a separate user action. On Windows, both operations use
+  immediate TerminateProcess; this is disclosed in the confirmation dialog.
+- A fresh scan after stopping shows whether the original endpoints remain occupied,
+  including under a new PID. A watcher may respawn a process; inspect it separately.
+- Docker/WSL/remote environments are outside this first version. A local forwarding
+  listener can appear, but this tool does not identify or stop the service behind it.
+
+The plugin does not probe HTTP endpoints, collect environment variables, persist
+process commands or transmit data. Closing the application leaves inspected
+services alone. Only a confirmed Stop or Force termination action sends a signal.

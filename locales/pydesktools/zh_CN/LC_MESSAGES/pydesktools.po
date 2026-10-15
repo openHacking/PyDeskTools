@@ -640,3 +640,156 @@ msgstr "退出 PyDeskTools"
 
 msgid "Exit the application instead of keeping it in the system tray."
 msgstr "彻底退出应用，而不是继续驻留在系统托盘。"
+
+msgid "Port Manager"
+msgstr "端口管理"
+
+msgid "Scan ports"
+msgstr "扫描端口"
+
+msgid "Stop service"
+msgstr "停止服务"
+
+msgid "Force termination"
+msgstr "强制结束"
+
+msgid "Service details"
+msgstr "服务详情"
+
+msgid "Unknown project"
+msgstr "未知项目"
+
+msgid "Development hints"
+msgstr "疑似开发服务"
+
+msgid "All listeners"
+msgstr "全部监听服务"
+
+msgid "No matching listeners."
+msgstr "没有匹配的监听服务。"
+
+msgid "Inspect local TCP listeners and stop one service at a time."
+msgstr "查看本机 TCP 监听端口，逐个停止服务。"
+
+msgid "Search port, project or process"
+msgstr "搜索端口、项目或进程"
+
+msgid "Scan ports to inspect running services."
+msgstr "扫描端口以查看正在运行的服务。"
+
+msgid "Scan complete. Select a service to inspect it."
+msgstr "扫描完成，选择服务查看详情。"
+
+msgid "All ports of this process will be affected. Child processes are not stopped."
+msgstr "此进程的所有端口都将受影响，不会结束子进程。"
+
+msgid "Windows ends the process immediately, including with Stop service."
+msgstr "Windows 会立即结束进程，点击“停止服务”也是如此。"
+
+msgid ""
+"Local machine only. Permissions may hide listeners or process details; Docker, WSL and remote "
+"services are not inspected internally."
+msgstr "仅扫描本机。权限限制可能隐藏监听端口或进程详情；不检查 Docker、WSL 和远程环境内部的服务。"
+
+msgid "Process exited. Check the refreshed list for released or reassigned ports."
+msgstr "进程已退出。请在刷新后的列表中检查端口是否已释放或被重新占用。"
+
+msgid "Process is still running. Select it again to force termination if needed."
+msgstr "进程仍在运行，如需强制结束，请重新选择它。"
+
+msgid "Process already exited. The list has been refreshed."
+msgstr "进程已经退出，列表已刷新。"
+
+msgid "Refresh the list and select the service again"
+msgstr "请刷新列表并重新选择服务"
+
+msgid "The process identity changed; refresh the list"
+msgstr "进程身份已变化，请刷新列表"
+
+msgid "The listening ports changed; refresh the list"
+msgstr "监听端口已变化，请刷新列表"
+
+msgid "This process cannot be stopped by this tool"
+msgstr "此工具不能停止该进程"
+
+msgid "Permission denied while stopping this process"
+msgstr "权限不足，无法停止该进程"
+
+msgid "Could not query local TCP listeners"
+msgstr "无法查询本机 TCP 监听端口"
+
+msgid "The system TCP listener query failed"
+msgstr "系统 TCP 监听端口查询失败"
+
+msgid "Permission denied while querying TCP listeners"
+msgstr "权限不足，无法查询 TCP 监听端口"
+
+msgid "No observed listeners on ports"
+msgstr "未发现监听的端口"
+
+msgid "Listeners remain on original port numbers"
+msgstr "原端口号中仍有监听"
+
+msgid "Ports"
+msgstr "端口"
+
+msgid "Project"
+msgstr "项目"
+
+msgid "Process"
+msgstr "进程"
+
+msgid "Uptime"
+msgstr "运行时长"
+
+msgid "Find the project using a port, then stop its service."
+msgstr "查看端口归属，停止对应项目的服务。"
+
+msgid "Scan scope"
+msgstr "扫描范围"
+
+msgid "More actions"
+msgstr "更多操作"
+
+msgid "Selected service"
+msgstr "所选服务"
+
+msgid "Select a row to see all listening addresses and the startup command."
+msgstr "选择一行，查看完整监听地址、项目目录和启动命令。"
+
+msgid "Listening addresses"
+msgstr "监听地址"
+
+msgid "Project directory"
+msgstr "项目目录"
+
+msgid "Startup command"
+msgstr "启动命令"
+
+msgid "Unavailable"
+msgstr "无法获取"
+
+msgid "Scanning ports…"
+msgstr "正在扫描端口…"
+
+msgid "Stopping service…"
+msgstr "正在停止服务…"
+
+msgid "No listeners found. Try scanning again or showing all listeners."
+msgstr "未发现监听服务，可重新扫描或切换到全部监听服务。"
+
+#, python-brace-format
+msgid "{services} services · {ports} ports"
+msgstr "{services} 个服务 · {ports} 个端口"
+
+#, python-brace-format
+msgid "{days}d {hours}h"
+msgstr "{days} 天 {hours} 小时"
+
+#, python-brace-format
+msgid "{hours}h {minutes}m"
+msgstr "{hours} 小时 {minutes} 分钟"
+
+#, python-brace-format
+msgid "{minutes}m"
+msgstr "{minutes} 分钟"

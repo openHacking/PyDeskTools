@@ -23,7 +23,7 @@
 ![PyDeskTools home screen](docs/assets/pydesktools-home.png)
 
 PyDeskTools keeps small, frequent file tasks fast and local. It needs no account and
-makes no network request at runtime. Version 0.1.0 includes two complete tools and an
+makes no network request at runtime. Version 0.2.0 includes three complete tools and an
 isolated plugin architecture for adding more.
 
 If PyDeskTools saves you time, a GitHub star helps other people discover it.
@@ -34,6 +34,7 @@ If PyDeskTools saves you time, a GitHub star helps other people discover it.
 | --- | --- |
 | **Image Compressor** | Batch-compress JPEG, PNG, and WebP; preview results; resize; preserve metadata; retry only failed items. |
 | **JSON Tools** | Format or minify without losing large integers or decimal precision; import UTF-8 files; copy and export complete results. |
+| **Port Manager (new in source builds)** | Inspect local TCP listeners, search projects and processes, and stop one service at a time. |
 
 Use the sidebar, search, command palette, file picker, or drag and drop. English and
 Simplified Chinese, light/dark appearance, plugin lifecycle controls, and a private
@@ -43,29 +44,29 @@ Closing the main window keeps PyDeskTools available from the Windows notificatio
 area, macOS menu bar, or a supported Linux system tray. Use the tray menu or `Ctrl+Q`
 (`Command+Q` on macOS) to quit the application completely.
 
-## Download v0.1.0
+## Download v0.2.0
 
-PyDeskTools 0.1.0 is an experimental pre-release. Download only from the
+PyDeskTools 0.2.0 is an experimental pre-release. Download only from the
 [official GitHub Releases page](https://github.com/openHacking/PyDeskTools/releases).
 
 | Platform | Artifact | Support and trust |
 | --- | --- | --- |
-| macOS 14+ on Apple silicon | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID signed beta, not notarized. Drag the app to Applications; first launch may require **Open Anyway** in Privacy & Security. |
-| Windows 10/11 x64 | `PyDeskTools-0.1.0-windows-x64-unsigned.exe` | **Unsigned beta.** Windows SmartScreen may warn. Verify the SHA-256/provenance before running. |
-| Linux x64 | `PyDeskTools-0.1.0-linux-x86_64.AppImage` | First-release support for X11 and XWayland on distributions compatible with Ubuntu 22.04. Native Wayland is not certified. |
+| macOS 14+ on Apple silicon | `PyDeskTools-0.2.0-macos-arm64.dmg` | Developer ID signed beta, not notarized. Drag the app to Applications; first launch may require **Open Anyway** in Privacy & Security. |
+| Windows 10/11 x64 | `PyDeskTools-0.2.0-windows-x64-unsigned.exe` | **Unsigned beta.** Windows SmartScreen may warn. Verify the SHA-256/provenance before running. |
+| Linux x64 | `PyDeskTools-0.2.0-linux-x86_64.AppImage` | First-release support for X11 and XWayland on distributions compatible with Ubuntu 22.04. Native Wayland is not certified. |
 
 On Linux, make the download executable before opening it:
 
 ```sh
-chmod +x PyDeskTools-0.1.0-linux-x86_64.AppImage
-./PyDeskTools-0.1.0-linux-x86_64.AppImage
+chmod +x PyDeskTools-0.2.0-linux-x86_64.AppImage
+./PyDeskTools-0.2.0-linux-x86_64.AppImage
 ```
 
 Every release includes `SHA256SUMS.txt`, per-platform build manifests, third-party
 license notices, and GitHub artifact attestations. Verify provenance with:
 
 ```sh
-gh attestation verify PyDeskTools-0.1.0-PLATFORM -R openHacking/PyDeskTools
+gh attestation verify PyDeskTools-0.2.0-PLATFORM -R openHacking/PyDeskTools
 ```
 
 ## Why it is trustworthy
@@ -79,7 +80,7 @@ gh attestation verify PyDeskTools-0.1.0-PLATFORM -R openHacking/PyDeskTools
   from pinned sources, checked hashes, immutable tags, and least-privilege CI jobs.
 - **Plain licensing:** the application is MIT licensed. Bundled dependency licenses and
   notices ship with every installer.
-- **Honest limits:** 0.1.0 has no online catalog, automatic updater, screenshot tool, or
+- **Honest limits:** 0.2.0 has no online catalog, automatic updater, screenshot tool, or
   certified Intel Mac/ARM Windows/ARM Linux build.
 
 Read the [security policy](SECURITY.md), [architecture](docs/architecture.md), and
@@ -98,6 +99,7 @@ python -m pip install -e ../PyDeskUI \
   -e packages/pydesktools-runtime \
   -e plugins/json-tools \
   -e plugins/image-compressor \
+  -e plugins/port-manager \
   -e '.[dev]'
 python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
 python scripts/build_bundles.py --target macos-arm64 \

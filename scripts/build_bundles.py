@@ -53,6 +53,7 @@ def main():
         "packages/pydesktools-sdk",
         "plugins/json-tools",
         "plugins/image-compressor",
+        "plugins/port-manager",
     ):
         project = ROOT / package
         shutil.rmtree(project / "build", ignore_errors=True)
@@ -81,8 +82,22 @@ def main():
             wheels,
             "simplejson==3.20.2",
             "Pillow==12.3.0",
+            "psutil==7.2.2",
         )
     manifests = {
+        "port-manager.pdtplugin": f"""schema = 1
+id = "org.pydesk.port-manager"
+name = "Port Manager"
+version = "0.1.0"
+distribution = "pydesk-port-manager"
+entrypoint = "pydesk_port_manager:create_plugin"
+requires_python = ">=3.13,<3.14"
+requires_sdk = ">=0.1.1,<0.2"
+protocol = 1
+platforms = ["{args.target}"]
+languages = ["en", "zh-CN"]
+capabilities = []
+""",
         "json-tools.pdtplugin": f"""schema = 1
 id = "org.pydesk.json-tools"
 name = "JSON Tools"
@@ -111,6 +126,7 @@ capabilities = ["dialogs.open_files"]
 """,
     }
     requirements = {
+        "port-manager.pdtplugin": ("pydesktools-sdk", "pydesk-port-manager", "psutil"),
         "json-tools.pdtplugin": ("pydesktools-sdk", "pydesk-json-tools", "simplejson"),
         "image-compressor.pdtplugin": (
             "pydesktools-sdk",

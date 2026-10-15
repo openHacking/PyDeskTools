@@ -64,3 +64,20 @@ Results include bytes, artifact_id, truncated and optional small inline text.
 Previews never exceed 64 KiB. Duplicate keys/nonfinite values fail with source
 positions. Decimal values are preserved numerically; whitespace/exponent spelling
 may change. Files decode UTF-8 (an optional UTF-8 BOM is accepted).
+
+## Port Manager (unreleased)
+
+`org.pydesk.port-manager` exposes `scan` (read, safe retry) and `stop` (external,
+manual retry). Scan returns services grouped by process with all visible TCP
+listeners, an opaque session token, process metadata and development hints.
+Stop takes `{token, force?}`; it accepts only a current scan token for an eligible
+current-user process. It rechecks PID creation time, ownership and observed endpoints.
+Every stop returns a fresh scan and `released_ports` / `occupied_ports` for the
+original port numbers, based on the visible listeners. Neither command probes HTTP.
+
+The first-party host supplies a searchable dedicated view and a confirmation dialog.
+No generic process-execution capability is added to the SDK. The worker performs
+OS operations using its existing current-user permissions; this is not a sandbox.
+Windows termination is immediate. POSIX normal stop uses SIGTERM, with a separately
+requested SIGKILL option. Child processes are not stopped. See the
+[plugin README](../plugins/port-manager/README.md) for visibility and environment limits.

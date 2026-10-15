@@ -182,9 +182,9 @@ class WindowsTray:
         self._poll_id = self._root.after(50, self._poll)
 
     def _message_loop(self):
-        user32 = ctypes.windll.user32
-        shell32 = ctypes.windll.shell32
-        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32  # type: ignore[attr-defined]
+        shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         kernel32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
         kernel32.GetModuleHandleW.restype = wintypes.HINSTANCE
         user32.CreateWindowExW.argtypes = [
@@ -248,7 +248,7 @@ class WindowsTray:
         user32.DestroyIcon.argtypes = [wintypes.HICON]
         user32.IsWindow.argtypes = [wintypes.HWND]
         user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
-        wndproc_type = ctypes.WINFUNCTYPE(
+        wndproc_type = ctypes.WINFUNCTYPE(  # type: ignore[attr-defined]
             ctypes.c_ssize_t, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
         )
 
@@ -336,18 +336,18 @@ class WindowsTray:
             window_class.lpszClassName = class_name
             atom = user32.RegisterClassW(ctypes.byref(window_class))
             if not atom:
-                raise ctypes.WinError()
+                raise ctypes.WinError()  # type: ignore[attr-defined]
             hwnd = user32.CreateWindowExW(
                 0, class_name, self._name, 0, 0, 0, 0, 0, None, None, instance, None
             )
             if not hwnd:
-                raise ctypes.WinError()
+                raise ctypes.WinError()  # type: ignore[attr-defined]
             self._hwnd = hwnd
             icon = user32.LoadImageW(
                 None, str(self._icon_path), 1, 0, 0, 0x0010 | 0x0040
             )
             if not icon:
-                raise ctypes.WinError()
+                raise ctypes.WinError()  # type: ignore[attr-defined]
             notify = NOTIFYICONDATAW()
             # The V2 structure contains every field used here and works with older shells too.
             notify.cbSize = NOTIFYICONDATAW.guidItem.offset
@@ -399,7 +399,7 @@ class WindowsTray:
             self._poll_id = None
         hwnd = self._hwnd
         if hwnd is not None:
-            ctypes.windll.user32.PostMessageW(hwnd, self._WM_CLOSE, 0, 0)
+            ctypes.windll.user32.PostMessageW(hwnd, self._WM_CLOSE, 0, 0)  # type: ignore[attr-defined]
             self._thread.join(timeout=2)
 
 

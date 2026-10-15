@@ -31,10 +31,14 @@ select = ["E4", "E7", "E9", "F", "I"]
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
-files = ["src/pydesktools", "packages/pydesktools-sdk/src", "packages/pydesktools-runtime/src", "plugins/json-tools/src", "plugins/image-compressor/src"]
+files = ["src/pydesktools", "packages/pydesktools-sdk/src", "packages/pydesktools-runtime/src", "plugins/json-tools/src", "plugins/image-compressor/src", "plugins/port-manager/src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
 [[tool.mypy.overrides]]
 module = ["AppKit", "Foundation", "objc"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["psutil"]
 ignore_missing_imports = true

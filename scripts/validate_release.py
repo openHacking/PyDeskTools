@@ -32,8 +32,9 @@ def main():
         "runtime": project_version(ROOT / "packages/pydesktools-runtime/pyproject.toml"),
         "json": project_version(ROOT / "plugins/json-tools/pyproject.toml"),
         "image": project_version(ROOT / "plugins/image-compressor/pyproject.toml"),
+        "port": project_version(ROOT / "plugins/port-manager/pyproject.toml"),
     }
-    expected_versions = {"sdk": "0.1.1", "runtime": "0.1.1", "json": "0.1.1", "image": "0.2.2"}
+    expected_versions = {"sdk": "0.1.1", "runtime": "0.1.1", "json": "0.1.1", "image": "0.2.2", "port": "0.1.0"}
     if packages != expected_versions:
         raise SystemExit(f"unexpected component versions: {packages}")
     print(json.dumps({"tag": args.tag, "application": version, "components": packages}))

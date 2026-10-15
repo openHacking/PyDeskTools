@@ -30,7 +30,7 @@ def test_readme_local_links_exist(readme):
 
 
 def test_release_version_and_runtime_matrix():
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.2.0"
     runtime = json.loads((ROOT / "runtime-sources.json").read_text())
     assert runtime["python"] == "3.13.7"
     assert set(runtime["targets"]) == {
@@ -42,7 +42,7 @@ def test_release_version_and_runtime_matrix():
 
 
 def test_bundled_plugins_match_local_release_target():
-    for name in ("json-tools.pdtplugin", "image-compressor.pdtplugin"):
+    for name in ("json-tools.pdtplugin", "image-compressor.pdtplugin", "port-manager.pdtplugin"):
         manifest, _ = inspect_bundle(ROOT / "src/pydesktools/bundles" / name)
         assert manifest["platforms"] == ["macos-arm64"]
 

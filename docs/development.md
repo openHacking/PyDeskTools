@@ -38,6 +38,7 @@ python -m pip install -e ../PyDeskUI \
   -e packages/pydesktools-runtime \
   -e plugins/json-tools \
   -e plugins/image-compressor \
+  -e plugins/port-manager \
   -e '.[dev]'
 python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
 python scripts/build_bundles.py --target macos-arm64 \
@@ -78,6 +79,7 @@ python -m pip install -e ../PyDeskUI `
   -e packages/pydesktools-runtime `
   -e plugins/json-tools `
   -e plugins/image-compressor `
+  -e plugins/port-manager `
   -e '.[dev]'
 python scripts/fetch_runtime.py --target windows-x86_64 --output build/plugin-runtime/windows-x86_64
 python scripts/build_bundles.py --target windows-x86_64 `

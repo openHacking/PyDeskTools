@@ -45,6 +45,7 @@ from pydeskui import (
 
 from ._version import VERSION
 from .platform import PlatformAdapter
+from .ports import PortManagerView
 from .tray import create_tray
 from .ui import (
     GenericToolView,
@@ -60,11 +61,13 @@ from .ui import (
 
 PLUGIN = "org.pydesk.json-tools"
 IMAGE_PLUGIN = "org.pydesk.image-compressor"
+PORT_PLUGIN = "org.pydesk.port-manager"
 DEFAULT_PLUGINS = {
     PLUGIN: "json-tools.pdtplugin",
     IMAGE_PLUGIN: "image-compressor.pdtplugin",
+    PORT_PLUGIN: "port-manager.pdtplugin",
 }
-DEFAULT_PLUGIN_VERSIONS = {PLUGIN: "0.1.1", IMAGE_PLUGIN: "0.2.2"}
+DEFAULT_PLUGIN_VERSIONS = {PLUGIN: "0.1.1", IMAGE_PLUGIN: "0.2.2", PORT_PLUGIN: "0.1.0"}
 LANGUAGE_PREFERENCES = ("system", "en", "zh-CN")
 THEME_PREFERENCES = ("system", "light", "dark")
 
@@ -503,6 +506,10 @@ class Application:
         )
         if values:
             self.json_tool.form.set_values(values)
+        self.port_tool = PortManagerView(
+            self.tools_host, translate=self.t, on_scan=lambda: self.run_port_command("scan"),
+            on_stop=self.stop_port_service, theme=self.theme,
+        )
         if image_files:
             self.image_tool.set_files(image_files)
 
@@ -580,9 +587,11 @@ class Application:
         self.refresh()
         if page == "tool" and self.current_plugin == IMAGE_PLUGIN and self.image_preview_pending:
             self.scheduler.call_later(0, self.request_image_preview)
+        if page == "tool" and self.current_plugin == PORT_PLUGIN:
+            self.scheduler.call_later(0, lambda: self.run_port_command("scan"))
 
     def _show_tool(self, plugin_id):
-        for tool_panel in (self.json_tool, self.image_tool):
+        for tool_panel in (self.json_tool, self.image_tool, self.port_tool):
             tool_panel.pack_forget()
         if self.generic_view is not None:
             self.generic_view.destroy()
@@ -597,6 +606,10 @@ class Application:
             active_panel = self.image_tool
             self.current_command = "import_images"
             self.detail = self.image_tool.result
+        elif plugin_id == PORT_PLUGIN:
+            active_panel = self.port_tool
+            self.current_command = "scan"
+            self.detail = self.port_tool.detail
         else:
             command = record["descriptor"]["commands"][0]
             self.current_command = command["id"]
@@ -772,7 +785,9 @@ class Application:
                             self.result_artifact = result["data"]["artifact_id"]
                         data = result["data"]
                         view = result.get("view")
-                        if completed_action == "import_images" and "files" in data:
+                        if task_plugin == PORT_PLUGIN:
+                            self.port_tool.set_result(data)
+                        elif completed_action == "import_images" and "files" in data:
                             imported = [item["path"] for item in data["files"]]
                             combined = list(dict.fromkeys([*self.image_tool.files, *imported]))
                             if len(combined) > 1000:
@@ -819,7 +834,9 @@ class Application:
                             if "line" in data
                             else ""
                         )
-                        if completed_action == "compress":
+                        if task_plugin == PORT_PLUGIN:
+                            self.port_tool.show_error(failure["message"])
+                        elif completed_action == "compress":
                             status = "canceled" if data.get("kind") in ("canceled", "forced_stop") else "failed"
                             items = [self.image_tool.file_results.get(path, {}) for path in self.image_tool.files]
                             items = [item if item.get("status") in ("completed", "skipped_larger", "failed") else
@@ -1036,6 +1053,8 @@ class Application:
         self.image_tool.sync_compression_action()
 
         self.image_tool.set_busy(self.active_action == "compress")
+        port_record = self.services.store.get(PORT_PLUGIN)
+        self.port_tool.set_busy(self.busy_visible or not bool(port_record and port_record["enabled"]))
 
     @staticmethod
     def _normalized(value):
@@ -1062,6 +1081,8 @@ class Application:
                 continue
             plugin_text = self._normalized(record["id"] + " " + record["manifest"]["name"])
             for command in record["descriptor"]["commands"]:
+                if record["id"] == PORT_PLUGIN and command["id"] == "stop":
+                    continue
                 identifier = record["id"] + ":" + command["id"]
                 if not query and identifier not in recent_order:
                     continue
@@ -1142,6 +1163,9 @@ class Application:
             self.error(str(error))
 
     def run_command(self, command, image_paths: list[str] | tuple[str, ...] | None = None):
+        if self.current_plugin == PORT_PLUGIN:
+            # Search results may expose stop; only a selected inspected service may stop.
+            return self.run_port_command("scan")
         if self.task and self.active_action == "preview" and self.current_plugin == IMAGE_PLUGIN and command != "preview":
             self.deferred_image_command = (command, image_paths)
             return True
@@ -1216,6 +1240,32 @@ class Application:
         except Exception as error:
             self._settle_busy_feedback()
             self.error(str(error))
+
+    def run_port_command(self, command, arguments=None):
+        if self.task or self.background_busy or self.closing:
+            return False
+        if self.current_page != "tool" or self.current_plugin != PORT_PLUGIN:
+            return False
+        try:
+            self.task = self.services.commands.submit(PORT_PLUGIN, command, arguments or {})
+            self.port_tool.begin_operation(command)
+            self._schedule_busy_feedback(command)
+            self.refresh()
+            return True
+        except Exception as error:
+            self._settle_busy_feedback()
+            self.error(str(error))
+            return False
+
+    def stop_port_service(self, service, force):
+        action = self.t("Force termination") if force else self.t("Stop service")
+        message = (f"{action}: {service['project'] or service['name']} (PID {service['pid']})\n"
+                   f"{self.port_tool.endpoints(service)}\n\n"
+                   + self.t("All ports of this process will be affected. Child processes are not stopped."))
+        if sys.platform == "win32":
+            message += "\n" + self.t("Windows ends the process immediately, including with Stop service.")
+        self.confirm(message, lambda: self.run_port_command(
+            "stop", {"token": service["token"], "force": force}))
 
     def cancel(self):
         self.background_token.cancel()

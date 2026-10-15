@@ -17,7 +17,7 @@ from pydesktools_sdk.protocol import encode, read, validate_progress_data
 def hidden_process_kwargs(os_name=None):
     """Return native flags that keep background children out of the desktop UI."""
     if (os_name or os.name) == "nt":
-        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}  # type: ignore[attr-defined]
     return {}
 
 

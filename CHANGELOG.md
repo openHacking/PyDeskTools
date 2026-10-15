@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Add the offline Port Manager plugin with searchable local TCP listeners,
+  project/process details, explicit single-process stop and force termination,
+  identity and endpoint rechecks, and post-stop port verification.
+- Add a dedicated English/Chinese desktop view and native offline bundle builds.
+- Give Port Manager a sortable table, responsive columns, complete scrollable
+  process details and grouped contextual actions; move scope notes into a popover.
+
 ## 0.1.0
 
 - Separate GUI, headless runtime and SDK packages; retire the prototype registry.

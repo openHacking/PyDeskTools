@@ -9,6 +9,8 @@ The macOS application additionally uses PyObjC core/Cocoa 12.2.2 (MIT) for
 nonblocking native file panels; it is not a UI-core/runtime/SDK dependency.
 The JSON plugin's simplejson dependency retains MIT/Academic Free License terms
 from its wheel. Its wheel includes upstream license files.
+The Port Manager plugin bundles psutil 7.2.2 (BSD-3-Clause); its upstream license
+is retained in the dependency wheel. On macOS it queries the system-provided lsof.
 
 The desktop distribution embeds CPython 3.13.7 from python-build-standalone
 20250918. The verified archive hashes are in runtime-sources.json. Native-library

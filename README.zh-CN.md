@@ -23,7 +23,7 @@
 ![PyDeskTools 主界面](docs/assets/pydesktools-home.png)
 
 PyDeskTools 让高频、琐碎的文件处理变得快速而安静：无需账号，运行时不发起网络请求，
-文件始终留在你的设备上。0.1.0 包含两个完整工具，以及可继续扩展的隔离插件架构。
+文件始终留在你的设备上。0.2.0 包含三个完整工具，以及可继续扩展的隔离插件架构。
 
 如果它帮你节省了时间，欢迎点一个 Star，让更多人看到它。
 
@@ -33,6 +33,7 @@ PyDeskTools 让高频、琐碎的文件处理变得快速而安静：无需账�
 | --- | --- |
 | **图片压缩** | 批量压缩 JPEG、PNG、WebP；预览结果、调整尺寸、保留元数据，并只重试失败项目。 |
 | **JSON 工具** | 格式化和压缩 JSON，不丢失大整数或小数精度；支持 UTF-8 导入、复制和完整导出。 |
+| **端口管理（源码版新增）** | 查看本机 TCP 监听端口、项目和进程，搜索并逐个停止服务；支持单独强制结束。 |
 
 你可以从侧边栏、搜索、命令面板、文件选择器或拖放开始。应用内置中英文、明暗主题、
 插件生命周期管理，以及独立的本地数据目录。
@@ -40,29 +41,29 @@ PyDeskTools 让高频、琐碎的文件处理变得快速而安静：无需账�
 关闭主窗口后，PyDeskTools 会继续驻留在 Windows 通知区域、macOS 菜单栏或受支持的
 Linux 系统托盘中。需要彻底退出时，请使用托盘菜单，或按 `Ctrl+Q`（macOS 为 `Command+Q`）。
 
-## 下载 v0.1.0
+## 下载 v0.2.0
 
-PyDeskTools 0.1.0 是实验性 Pre-release。请只从
+PyDeskTools 0.2.0 是实验性 Pre-release。请只从
 [官方 GitHub Releases 页面](https://github.com/openHacking/PyDeskTools/releases)下载。
 
 | 平台 | 文件 | 支持与可信状态 |
 | --- | --- | --- |
-| Apple 芯片 Mac，macOS 14+ | `PyDeskTools-0.1.0-macos-arm64.dmg` | Developer ID 签名的测试版，未做 Apple 公证。拖入“应用程序”后，首次启动可能需要在“隐私与安全性”中选择“仍要打开”。 |
-| Windows 10/11 x64 | `PyDeskTools-0.1.0-windows-x64-unsigned.exe` | **未签名 Beta。** SmartScreen 可能提示风险，请先核对 SHA-256 和构建来源。 |
-| Linux x64 | `PyDeskTools-0.1.0-linux-x86_64.AppImage` | 首轮支持与 Ubuntu 22.04 兼容的 X11/XWayland 桌面，尚未认证原生 Wayland。 |
+| Apple 芯片 Mac，macOS 14+ | `PyDeskTools-0.2.0-macos-arm64.dmg` | Developer ID 签名的测试版，未做 Apple 公证。拖入“应用程序”后，首次启动可能需要在“隐私与安全性”中选择“仍要打开”。 |
+| Windows 10/11 x64 | `PyDeskTools-0.2.0-windows-x64-unsigned.exe` | **未签名 Beta。** SmartScreen 可能提示风险，请先核对 SHA-256 和构建来源。 |
+| Linux x64 | `PyDeskTools-0.2.0-linux-x86_64.AppImage` | 首轮支持与 Ubuntu 22.04 兼容的 X11/XWayland 桌面，尚未认证原生 Wayland。 |
 
 Linux 下载后需要添加执行权限：
 
 ```sh
-chmod +x PyDeskTools-0.1.0-linux-x86_64.AppImage
-./PyDeskTools-0.1.0-linux-x86_64.AppImage
+chmod +x PyDeskTools-0.2.0-linux-x86_64.AppImage
+./PyDeskTools-0.2.0-linux-x86_64.AppImage
 ```
 
 每个 Release 都包含 `SHA256SUMS.txt`、各平台构建清单、第三方许可证和 GitHub
 artifact attestation。验证构建来源：
 
 ```sh
-gh attestation verify PyDeskTools-0.1.0-平台文件名 -R openHacking/PyDeskTools
+gh attestation verify PyDeskTools-0.2.0-平台文件名 -R openHacking/PyDeskTools
 ```
 
 ## 为什么值得信赖
@@ -73,7 +74,7 @@ gh attestation verify PyDeskTools-0.1.0-平台文件名 -R openHacking/PyDeskToo
 - **可审计发布：** 各平台在对应原生系统上构建，固定依赖来源和哈希，使用不可变标签、
   最小 CI 权限和公开构建证明。
 - **许可证透明：** 应用使用 MIT 许可证，每个安装包同时携带依赖许可证和 notices。
-- **不夸大范围：** 0.1.0 尚无在线插件市场、自动更新、截图工具、Intel Mac 或 ARM
+- **不夸大范围：** 0.2.0 尚无在线插件市场、自动更新、截图工具、Intel Mac 或 ARM
   Windows/Linux 安装包。
 
 更精确的边界请查看[安全策略](SECURITY.md)、[架构文档](docs/architecture.md)和
@@ -91,6 +92,7 @@ python -m pip install -e ../PyDeskUI \
   -e packages/pydesktools-runtime \
   -e plugins/json-tools \
   -e plugins/image-compressor \
+  -e plugins/port-manager \
   -e '.[dev]'
 python scripts/fetch_runtime.py --target macos-arm64 --output build/plugin-runtime/macos-arm64
 python scripts/build_bundles.py --target macos-arm64 \
