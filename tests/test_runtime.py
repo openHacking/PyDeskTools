@@ -68,6 +68,7 @@ def test_application_views_use_pydeskui_components():
         b'{"jsonrpc":"2.0","id":"h-1","result":NaN}\n',
         b"x" * (1024 * 1024 + 1),
     ],
+    ids=["non_object", "duplicate_key", "nonfinite", "oversized_frame"],
 )
 def test_protocol_rejects(payload):
     with pytest.raises(ValueError):
