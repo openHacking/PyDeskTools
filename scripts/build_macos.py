@@ -84,6 +84,10 @@ def main():
             magic = stream.read(4)
         if magic in (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe"):
             options = ["--options", "runtime", "--timestamp"] if args.identity != "-" else []
+            if args.identity != "-" and path.resolve() == (
+                runtime / runtime_entry["executable"]
+            ).resolve():
+                options += ["--entitlements", ROOT / "packaging/macos/worker-entitlements.plist"]
             run("codesign", "--force", "--sign", args.identity, *options, path)
     manifest = {
         "version": runtime_config["python"],

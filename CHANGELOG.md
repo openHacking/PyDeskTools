@@ -2,6 +2,8 @@
 
 ## 0.2.0
 
+- Allow the signed macOS plugin interpreter to load native wheel extensions
+  with upstream signatures, while retaining library validation for the GUI.
 - Add the offline Port Manager plugin with searchable local TCP listeners,
   project/process details, explicit single-process stop and force termination,
   identity and endpoint rechecks, and post-stop port verification.

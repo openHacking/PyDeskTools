@@ -50,6 +50,11 @@ for notarization. Users may need to approve the app with **Open Anyway** in macO
 Privacy & Security on first launch. Signing failures are fatal; there is no fallback
 to ad-hoc signing.
 
+The signed plugin interpreter carries the `disable-library-validation` entitlement
+from `packaging/macos/worker-entitlements.plist`, so native wheels such as Pillow
+and psutil can retain their upstream signatures. This entitlement is applied only
+to the plugin interpreter; the GUI keeps its normal hardened-runtime validation.
+
 ### Windows
 
 Install [Inno Setup 6](https://jrsoftware.org/isdl.php), which provides the
