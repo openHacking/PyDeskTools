@@ -66,10 +66,13 @@ jobs:
       - run: python scripts/build_bundles.py --target macos-arm64 --runtime-source build/plugin-runtime/macos-arm64/python
       - run: ruff check src packages plugins scripts tests
       - run: mypy
-      - name: Run desktop tests with hang diagnostics
+      - name: Run desktop tests in a fresh process
         timeout-minutes: 5
         run: >-
           python -c 'import subprocess, sys;
-          subprocess.run([sys.executable, "-m", "pytest", "-vv", "-o", "faulthandler_timeout=60"],
+          subprocess.run([sys.executable, "-m", "pytest", "tests/test_gui.py", "-vv", "-o", "faulthandler_timeout=60"],
           check=True, timeout=180)'
+      - name: Run remaining tests
+        timeout-minutes: 5
+        run: python -m pytest --ignore=tests/test_gui.py -vv -o faulthandler_timeout=60
       - run: python -m build && python -m twine check dist/*.whl dist/*.tar.gz
